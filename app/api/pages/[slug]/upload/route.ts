@@ -17,7 +17,7 @@ async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {
   const { data: buckets } = await supabase.storage.listBuckets()
   const exists = buckets?.some((b) => b.name === BUCKET)
   if (!exists) {
-    await supabase.storage.createBucket(BUCKET, { public: true, fileSizeLimit: MAX_SIZE })
+    await supabase.storage.createBucket(BUCKET, { public: true })
   }
 }
 
