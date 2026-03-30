@@ -11,6 +11,15 @@ const ALLOWED_MIME = [
   'application/pdf',
 ]
 const MAX_SIZE = 100 * 1024 * 1024 // 100MB
+const BUCKET = 'media'
+
+async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {
+  const { data: buckets } = await supabase.storage.listBuckets()
+  const exists = buckets?.some((b) => b.name === BUCKET)
+  if (!exists) {
+    await supabase.storage.createBucket(BUCKET, { public: true, fileSizeLimit: MAX_SIZE })
+  }
+}
 
 export async function POST(
   req: NextRequest,
@@ -39,18 +48,22 @@ export async function POST(
   }
 
   const supabase = getSupabaseAdmin()
-  const ext = file.name.split('.').pop()
+
+  // 버킷이 없으면 자동 생성
+  await ensureBucket(supabase)
+
+  const ext = file.name.split('.').pop() ?? 'bin'
   const path = `${slug}/${Date.now()}.${ext}`
   const buffer = await file.arrayBuffer()
 
   const { error } = await supabase.storage
-    .from('media')
+    .from(BUCKET)
     .upload(path, buffer, { contentType: file.type, upsert: false })
 
   if (error) {
-    return NextResponse.json({ error: '업로드에 실패했습니다.' }, { status: 500 })
+    return NextResponse.json({ error: `업로드 실패: ${error.message}` }, { status: 500 })
   }
 
-  const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path)
+  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
   return NextResponse.json({ url: publicUrl }, { status: 201 })
 }

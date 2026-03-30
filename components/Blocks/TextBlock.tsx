@@ -22,6 +22,19 @@ export default function TextBlock({ block, selected, onUpdate, onDelete, onAddBe
   const ref = useRef<HTMLDivElement>(null)
   const style = STYLES[block.type]
 
+  // 초기 마운트 시 한 번만 content 설정 — React가 children을 관리하지 않도록
+  useEffect(() => {
+    if (ref.current) ref.current.textContent = block.content ?? ''
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 외부(로드/복원)에서 content가 바뀔 때만 DOM 동기화 (타이핑 중엔 스킵)
+  useEffect(() => {
+    if (ref.current && document.activeElement !== ref.current) {
+      ref.current.textContent = block.content ?? ''
+    }
+  }, [block.content])
+
   useEffect(() => {
     if (selected && ref.current && document.activeElement !== ref.current) {
       ref.current.focus()
@@ -48,9 +61,7 @@ export default function TextBlock({ block, selected, onUpdate, onDelete, onAddBe
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onAddBelow(block.id) }
           if (e.key === 'Backspace' && !ref.current?.textContent?.trim()) { e.preventDefault(); onDelete(block.id) }
         }}
-      >
-        {block.content}
-      </div>
+      />
       <button
         onClick={() => onDelete(block.id)}
         aria-label="블록 삭제"

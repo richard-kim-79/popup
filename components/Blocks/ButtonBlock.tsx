@@ -16,6 +16,19 @@ export default function ButtonBlock({ block, selected, onUpdate, onDelete, onAdd
   const labelRef = useRef<HTMLDivElement>(null)
   const [showHref, setShowHref] = useState(false)
 
+  // 초기 마운트 시 한 번만 label 설정
+  useEffect(() => {
+    if (labelRef.current) labelRef.current.textContent = block.label ?? ''
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 외부 변경 시만 DOM 동기화
+  useEffect(() => {
+    if (labelRef.current && document.activeElement !== labelRef.current) {
+      labelRef.current.textContent = block.label ?? ''
+    }
+  }, [block.label])
+
   useEffect(() => {
     if (selected && labelRef.current && document.activeElement !== labelRef.current) {
       labelRef.current.focus()
@@ -36,9 +49,7 @@ export default function ButtonBlock({ block, selected, onUpdate, onDelete, onAdd
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onAddBelow(block.id) }
           }}
-        >
-          {block.label}
-        </div>
+        />
         <button
           onClick={() => setShowHref((v) => !v)}
           title="링크 설정"
