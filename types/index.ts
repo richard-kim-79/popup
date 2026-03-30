@@ -69,6 +69,19 @@ export interface Payment {
   created_at: string
 }
 
+// --- Report ---
+
+export type ReportReason = 'illegal' | 'spam' | 'adult' | 'other'
+
+export interface Report {
+  id: string
+  page_id: string
+  reason: ReportReason
+  detail: string | null
+  ip_hash: string
+  created_at: string
+}
+
 // --- API Response shapes ---
 
 export interface CreatePageResponse {
@@ -117,6 +130,7 @@ export type Database = {
           user_id: string | null
           view_count: number
           deleted_at: string | null
+          report_count: number
           created_at: string
           updated_at: string
         }
@@ -131,6 +145,7 @@ export type Database = {
           user_id?: string | null
           view_count?: number
           deleted_at?: string | null
+          report_count?: number
           created_at?: string
           updated_at?: string
         }
@@ -145,8 +160,36 @@ export type Database = {
           user_id?: string | null
           view_count?: number
           deleted_at?: string | null
+          report_count?: number
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          id: string
+          page_id: string
+          reason: string
+          detail: string | null
+          ip_hash: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          page_id: string
+          reason: string
+          detail?: string | null
+          ip_hash: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          page_id?: string
+          reason?: string
+          detail?: string | null
+          ip_hash?: string
+          created_at?: string
         }
         Relationships: []
       }

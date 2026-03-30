@@ -1,9 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Logo from '@/components/UI/Logo'
+import ReportButton from '@/components/ReportButton'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { daysLeft } from '@/lib/slug'
 import type { Block } from '@/types'
+
+const REPORT_HIDE_THRESHOLD = 3
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -44,13 +47,14 @@ export default async function ViewerPage({ params }: Props) {
 
   const { data, error } = await supabase
     .from('pages')
-    .select('blocks, locked, expires_at, deleted_at')
+    .select('blocks, locked, expires_at, deleted_at, report_count')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
 
   if (error || !data) notFound()
 
+  const isHidden = (data.report_count ?? 0) >= REPORT_HIDE_THRESHOLD
   const blocks = (data.blocks as unknown) as Block[]
   const remaining = daysLeft(data.expires_at)
 
@@ -82,13 +86,25 @@ export default async function ViewerPage({ params }: Props) {
 
       {/* Content */}
       <div className="mx-auto max-w-[700px] px-6 py-14">
-        {blocks.map(renderBlock)}
+        {isHidden ? (
+          <div className="py-20 text-center">
+            <p className="mb-2 text-lg font-semibold text-popup-text">이 페이지는 숨김 처리되었습니다</p>
+            <p className="text-sm text-popup-muted">커뮤니티 신고로 인해 콘텐츠가 제한되었습니다.</p>
+          </div>
+        ) : (
+          blocks.map(renderBlock)
+        )}
       </div>
 
       {/* Footer */}
       <div className="border-t border-popup-border px-6 py-4 text-center">
-        <span className="text-xs text-popup-faint">{remaining}일 후 소멸 · </span>
-        <Link href="/" className="text-xs text-popup-faint hover:text-popup-muted">Popup으로 만들기</Link>
+        <div className="flex items-center justify-center gap-3">
+          <span className="text-xs text-popup-faint">{remaining}일 후 소멸</span>
+          <span className="text-popup-faint">·</span>
+          <ReportButton slug={slug} />
+          <span className="text-popup-faint">·</span>
+          <Link href="/" className="text-xs text-popup-faint hover:text-popup-muted">Popup으로 만들기</Link>
+        </div>
       </div>
     </div>
   )
