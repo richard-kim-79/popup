@@ -1,17 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Logo from '@/components/UI/Logo'
+import { getSupabaseAdmin } from '@/lib/supabase-server'
+import { daysLeft } from '@/lib/slug'
 import type { Block } from '@/types'
 
 interface Props {
   params: Promise<{ slug: string }>
-}
-
-async function getPage(slug: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
-  const res = await fetch(`${baseUrl}/api/pages/${slug}`, { next: { revalidate: 10 } })
-  if (!res.ok) return null
-  return res.json()
 }
 
 function renderBlock(block: Block) {
@@ -45,9 +40,19 @@ function renderBlock(block: Block) {
 
 export default async function ViewerPage({ params }: Props) {
   const { slug } = await params
-  const data = await getPage(slug)
+  const supabase = getSupabaseAdmin()
 
-  if (!data) notFound()
+  const { data, error } = await supabase
+    .from('pages')
+    .select('blocks, locked, expires_at, deleted_at')
+    .eq('slug', slug)
+    .is('deleted_at', null)
+    .single()
+
+  if (error || !data) notFound()
+
+  const blocks = (data.blocks as unknown) as Block[]
+  const remaining = daysLeft(data.expires_at)
 
   return (
     <div className="min-h-screen bg-popup-white">
@@ -57,9 +62,14 @@ export default async function ViewerPage({ params }: Props) {
           <Logo size={18} />
           <span className="text-sm font-bold text-popup-text">Popup</span>
         </Link>
-        {data.locked && (
-          <span className="rounded bg-popup-warn-bg px-2 py-0.5 text-xs text-popup-warn">🔒 잠금됨</span>
-        )}
+        <div className="flex items-center gap-3">
+          {data.locked && (
+            <span className="rounded bg-popup-warn-bg px-2 py-0.5 text-xs text-popup-warn">🔒 잠금됨</span>
+          )}
+          <Link href={`/${slug}/edit`} className="text-xs text-popup-muted hover:text-popup-text">
+            편집
+          </Link>
+        </div>
       </nav>
 
       {/* Locked banner */}
@@ -72,7 +82,13 @@ export default async function ViewerPage({ params }: Props) {
 
       {/* Content */}
       <div className="mx-auto max-w-[700px] px-6 py-14">
-        {data.blocks.map(renderBlock)}
+        {blocks.map(renderBlock)}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-popup-border px-6 py-4 text-center">
+        <span className="text-xs text-popup-faint">{remaining}일 후 소멸 · </span>
+        <Link href="/" className="text-xs text-popup-faint hover:text-popup-muted">Popup으로 만들기</Link>
       </div>
     </div>
   )
