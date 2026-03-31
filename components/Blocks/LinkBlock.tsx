@@ -1,8 +1,9 @@
 'use client'
 
 import { useRef, useState, useCallback, useEffect } from 'react'
-import type { LinkBlock as LinkBlockType, ImageWidth } from '@/types'
+import type { LinkBlock as LinkBlockType, ImageWidth, SocialEmbedType } from '@/types'
 import SizeOverlay, { getWidthClass } from './SizeOverlay'
+import SocialEmbed from './SocialEmbed'
 
 interface Props {
   block: LinkBlockType
@@ -19,6 +20,20 @@ function decodeEntities(str: string): string {
   const el = document.createElement('textarea')
   el.innerHTML = str
   return el.value
+}
+
+/** SNS URL 감지 — twitter/instagram/tiktok */
+function detectSocialEmbed(url: string): { embedType: SocialEmbedType; embedId: string } | null {
+  const twitter = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/)
+  if (twitter) return { embedType: 'twitter', embedId: twitter[1] }
+
+  const instagram = url.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/)
+  if (instagram) return { embedType: 'instagram', embedId: instagram[1] }
+
+  const tiktok = url.match(/tiktok\.com\/@[\w.]+\/video\/(\d+)/)
+  if (tiktok) return { embedType: 'tiktok', embedId: tiktok[1] }
+
+  return null
 }
 
 export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
@@ -48,6 +63,19 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
 
     setError('')
     setLoading(true)
+
+    // SNS 임베드 감지 — OG fetch 없이 바로 저장
+    const social = detectSocialEmbed(url)
+    if (social) {
+      onUpdate(block.id, {
+        url,
+        title: safeHostname(url),
+        embedType: social.embedType,
+        embedId: social.embedId,
+      })
+      setLoading(false)
+      return
+    }
 
     try {
       const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
@@ -86,6 +114,33 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
     onUpdate(block.id, { width: w })
     setShowSize(false)
   }, [block.id, onUpdate])
+
+  // Social embed render
+  if (block.url && block.embedType && block.embedId) {
+    return (
+      <div className="group relative">
+        <SocialEmbed embedType={block.embedType} embedId={block.embedId} url={block.url} />
+        {/* hover 수정·삭제 버튼 */}
+        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            onClick={() => {
+              setInputUrl(block.url ?? '')
+              onUpdate(block.id, { url: undefined, title: undefined, embedType: undefined, embedId: undefined })
+            }}
+            className="rounded bg-black/50 px-2 py-0.5 text-xs text-white hover:bg-black/70"
+          >
+            수정
+          </button>
+          <button
+            onClick={() => onDelete(block.id)}
+            className="rounded bg-black/50 px-2 py-0.5 text-xs text-white hover:bg-black/70"
+          >
+            삭제
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // Rendered preview card
   if (block.url && block.title) {

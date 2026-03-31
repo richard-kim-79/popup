@@ -43,6 +43,8 @@ export interface YoutubeBlock extends BaseBlock {
   width?: ImageWidth
 }
 
+export type SocialEmbedType = 'twitter' | 'instagram' | 'tiktok'
+
 export interface LinkBlock extends BaseBlock {
   type: 'link'
   url?: string
@@ -51,6 +53,8 @@ export interface LinkBlock extends BaseBlock {
   favicon?: string
   image?: string
   width?: ImageWidth
+  embedType?: SocialEmbedType
+  embedId?: string
 }
 
 export type Block = TextBlock | ImageBlock | ButtonBlock | DividerBlock | YoutubeBlock | LinkBlock

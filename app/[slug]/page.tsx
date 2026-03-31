@@ -5,6 +5,7 @@ import ReportButton from '@/components/ReportButton'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { daysLeft } from '@/lib/slug'
 import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
+import SocialEmbed from '@/components/Blocks/SocialEmbed'
 
 /** URL에서 hostname 안전하게 추출 */
 function safeHostname(url: string): string {
@@ -109,6 +110,16 @@ function renderBlock(block: Block) {
       )
     case 'link': {
       if (!block.url) return null
+
+      // SNS 임베드
+      if (block.embedType && block.embedId) {
+        return (
+          <div key={block.id} className="mb-4">
+            <SocialEmbed embedType={block.embedType} embedId={block.embedId} url={block.url} />
+          </div>
+        )
+      }
+
       const lw = block.width ?? 'full'
       const arrowIcon = (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
