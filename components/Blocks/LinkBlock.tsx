@@ -10,6 +10,10 @@ interface Props {
   onDelete: (id: string) => void
 }
 
+function safeHostname(url: string): string {
+  try { return new URL(url).hostname } catch { return url }
+}
+
 /** 브라우저 textarea를 이용한 HTML 엔티티 디코딩 (클라이언트 전용) */
 function decodeEntities(str: string): string {
   const el = document.createElement('textarea')
@@ -135,7 +139,7 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
                   </p>
                 )}
                 <p className="mt-1 truncate text-xs text-popup-faint">
-                  {new URL(block.url).hostname}
+                  {safeHostname(block.url)}
                 </p>
               </div>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">

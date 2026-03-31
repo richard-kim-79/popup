@@ -6,6 +6,11 @@ import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { daysLeft } from '@/lib/slug'
 import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
 
+/** URL에서 hostname 안전하게 추출 */
+function safeHostname(url: string): string {
+  try { return new URL(url).hostname } catch { return url }
+}
+
 /** HTML 엔티티 서버사이드 디코딩 */
 function decodeHtmlEntities(str: string): string {
   return str
@@ -116,7 +121,7 @@ function renderBlock(block: Block) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-popup-text">{decodeHtmlEntities(block.title ?? '')}</p>
                 {block.description && <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">{decodeHtmlEntities(block.description)}</p>}
-                <p className="mt-1 truncate text-xs text-popup-faint">{new URL(block.url).hostname}</p>
+                <p className="mt-1 truncate text-xs text-popup-faint">{safeHostname(block.url)}</p>
               </div>
             </div>
           </a>
@@ -185,7 +190,7 @@ export default async function ViewerPage({ params }: Props) {
       {/* Footer */}
       <div className="border-t border-popup-border px-6 py-4 text-center">
         <div className="flex items-center justify-center gap-3">
-          <span className="text-xs text-popup-faint">{remaining}일 후 소멸</span>
+          <span className="text-xs text-popup-faint">{remaining > 0 ? `${remaining}일 후 소멸` : '소멸됨'}</span>
           <span className="text-popup-faint">·</span>
           <ReportButton slug={slug} />
           <span className="text-popup-faint">·</span>
