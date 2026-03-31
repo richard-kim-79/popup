@@ -130,12 +130,30 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
             </svg>
           </div>
         </a>
-        <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(block.id) }}
-          className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
-        >
-          ×
-        </button>
+
+        {/* hover 시 컨트롤 버튼들 */}
+        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          {/* URL 변경 */}
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setInputUrl(block.url ?? '')
+              onUpdate(block.id, { url: undefined, title: undefined, description: undefined, favicon: undefined, image: undefined })
+            }}
+            className="rounded bg-black/50 px-2 py-0.5 text-xs text-white hover:bg-black/70"
+            title="URL 변경"
+          >
+            수정
+          </button>
+          {/* 삭제 */}
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(block.id) }}
+            className="rounded bg-black/50 px-2 py-0.5 text-xs text-white hover:bg-black/70"
+          >
+            삭제
+          </button>
+        </div>
       </div>
     )
   }
