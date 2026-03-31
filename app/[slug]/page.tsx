@@ -46,13 +46,6 @@ function renderBlock(block: Block) {
     case 'image': {
       if (!block.url) return null
       const displayName = block.filename ?? (() => { try { return decodeURIComponent(block.url!.split('/').pop()?.split('?')[0] ?? '파일') } catch { return '파일' } })()
-      if (block.url.match(/\.(mp4|mov)$/i))
-        return (
-          <div key={block.id} className={`mb-4 ${IMG_WIDTH[block.width ?? 'full']}`}>
-            <video src={block.url} controls className="w-full rounded-lg" />
-            <p className="mt-1 truncate text-xs text-popup-faint" title={displayName}>{displayName}</p>
-          </div>
-        )
       if (block.url.toLowerCase().endsWith('.pdf'))
         return (
           <div key={block.id} className={`mb-4 ${IMG_WIDTH[block.width ?? 'full']}`}>

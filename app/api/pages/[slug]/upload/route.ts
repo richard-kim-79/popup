@@ -7,10 +7,9 @@ type Params = { params: Promise<{ slug: string }> }
 
 const ALLOWED_MIME = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'video/mp4', 'video/quicktime',
   'application/pdf',
 ]
-const MAX_SIZE = 100 * 1024 * 1024 // 100MB
+const MAX_SIZE = 20 * 1024 * 1024 // 20MB
 const BUCKET = 'media'
 
 async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {

@@ -22,8 +22,7 @@ function getFilename(url: string, fallback?: string): string {
   }
 }
 
-function isVideo(url: string) { return /\.(mp4|mov)$/i.test(url) }
-function isPDF(url: string)   { return url.toLowerCase().endsWith('.pdf') }
+function isPDF(url: string) { return url.toLowerCase().endsWith('.pdf') }
 
 export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -105,38 +104,6 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       )
     }
 
-    /* ── 동영상 ── */
-    if (isVideo(block.url)) {
-      return (
-        <div
-          className="group relative"
-          onMouseEnter={() => setShowSize(true)}
-          onMouseLeave={() => setShowSize(false)}
-        >
-          <div className={`${widthClass} relative transition-all duration-200`}>
-            <video
-              src={block.url}
-              controls
-              className="w-full rounded-lg"
-              style={{ pointerEvents: showSize ? 'none' : 'auto' }}
-            />
-            {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
-          </div>
-          <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
-              <rect x="2" y="2" width="20" height="20" rx="4" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M10 8.5l6 3.5-6 3.5V8.5z" fill="currentColor" opacity="0.5" />
-            </svg>
-            <span className="max-w-full truncate text-xs text-popup-faint" title={displayName}>{displayName}</span>
-          </div>
-          <button onClick={() => onDelete(block.id)}
-            className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
-            삭제
-          </button>
-        </div>
-      )
-    }
-
     /* ── 이미지 ── */
     return (
       <div
@@ -179,7 +146,7 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && !uploading) handleFile(f) }}
     >
       <input ref={inputRef} type="file"
-        accept="image/*,video/mp4,video/quicktime,application/pdf"
+        accept="image/*,application/pdf"
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
 
@@ -200,7 +167,7 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
             <circle cx="8.5" cy="8.5" r="1.75" stroke="currentColor" strokeWidth="1.2" />
             <path d="M3 16l4.5-4 3.5 3 3-2 7 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <p className="text-sm text-popup-muted">이미지 / 동영상 / 문서 업로드</p>
+          <p className="text-sm text-popup-muted">이미지 / 문서 업로드</p>
           <p className="mt-1 text-xs text-popup-faint">클릭하거나 파일을 드래그하세요</p>
         </>
       )}
