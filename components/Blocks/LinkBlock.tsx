@@ -89,8 +89,13 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
 
   // Rendered preview card
   if (block.url && block.title) {
-    const hasImage = !!block.image
+    const w = block.width ?? 'full'
     const widthClass = getWidthClass(block.width)
+    const arrowIcon = (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
+        <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
 
     return (
       <div
@@ -105,46 +110,59 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
             rel="noopener noreferrer"
             className="block overflow-hidden rounded-lg border border-popup-border bg-popup-white transition-colors hover:border-popup-muted"
           >
-            {/* OG Image */}
-            {hasImage && (
+            {/* OG Image — 대만 표시 */}
+            {w === 'full' && block.image && (
               <div className="relative aspect-[1.91/1] w-full overflow-hidden bg-popup-bg">
                 <img
                   src={block.image}
                   alt=""
                   className="h-full w-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                  }}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
               </div>
             )}
-            {/* Text content */}
+
             <div className="flex items-center gap-3 p-4">
+              {/* 파비콘 — 항상 표시 */}
               {block.favicon && (
-                <img
-                  src={block.favicon}
-                  alt=""
-                  width={20}
-                  height={20}
-                  className="shrink-0 rounded"
-                />
+                <img src={block.favicon} alt="" width={20} height={20} className="shrink-0 rounded" />
               )}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-popup-text">
-                  {decodeEntities(block.title ?? '')}
-                </p>
-                {block.description && (
-                  <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">
-                    {decodeEntities(block.description)}
+
+              {/* 소: 호스트명만 */}
+              {w === 'small' && (
+                <>
+                  <p className="truncate text-xs text-popup-faint">{safeHostname(block.url)}</p>
+                  {arrowIcon}
+                </>
+              )}
+
+              {/* 중: 제목만 */}
+              {w === 'medium' && (
+                <>
+                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-popup-text">
+                    {decodeEntities(block.title ?? '')}
                   </p>
-                )}
-                <p className="mt-1 truncate text-xs text-popup-faint">
-                  {safeHostname(block.url)}
-                </p>
-              </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
-                <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+                  {arrowIcon}
+                </>
+              )}
+
+              {/* 대: 제목 + 설명 + 호스트명 */}
+              {w === 'full' && (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-popup-text">
+                      {decodeEntities(block.title ?? '')}
+                    </p>
+                    {block.description && (
+                      <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">
+                        {decodeEntities(block.description)}
+                      </p>
+                    )}
+                    <p className="mt-1 truncate text-xs text-popup-faint">{safeHostname(block.url)}</p>
+                  </div>
+                  {arrowIcon}
+                </>
+              )}
             </div>
           </a>
 

@@ -107,28 +107,58 @@ function renderBlock(block: Block) {
           </div>
         </div>
       )
-    case 'link':
+    case 'link': {
       if (!block.url) return null
+      const lw = block.width ?? 'full'
+      const arrowIcon = (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
+          <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
       return (
-        <div key={block.id} className={`mb-4 ${IMG_WIDTH[block.width ?? 'full']}`}>
+        <div key={block.id} className={`mb-4 ${IMG_WIDTH[lw]}`}>
           <a href={block.url} target="_blank" rel="noopener noreferrer"
             className="block overflow-hidden rounded-lg border border-popup-border bg-popup-white transition-colors hover:border-popup-muted">
-            {block.image && (
-              <div className="aspect-[1.91/1] w-full overflow-hidden bg-popup-bg">
+            {/* OG Image — full size only */}
+            {lw === 'full' && block.image && (
+              <div className="relative aspect-[1.91/1] w-full overflow-hidden bg-popup-bg">
                 <img src={block.image} alt="" className="h-full w-full object-cover" />
               </div>
             )}
             <div className="flex items-center gap-3 p-4">
               {block.favicon && <img src={block.favicon} alt="" width={20} height={20} className="shrink-0 rounded" />}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-popup-text">{decodeHtmlEntities(block.title ?? '')}</p>
-                {block.description && <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">{decodeHtmlEntities(block.description)}</p>}
-                <p className="mt-1 truncate text-xs text-popup-faint">{safeHostname(block.url)}</p>
-              </div>
+              {/* 소: hostname only */}
+              {lw === 'small' && (
+                <>
+                  <p className="truncate text-xs text-popup-faint">{safeHostname(block.url)}</p>
+                  {arrowIcon}
+                </>
+              )}
+              {/* 중: title only */}
+              {lw === 'medium' && (
+                <>
+                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-popup-text">
+                    {decodeHtmlEntities(block.title ?? '')}
+                  </p>
+                  {arrowIcon}
+                </>
+              )}
+              {/* 대: title + description + hostname */}
+              {lw === 'full' && (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-popup-text">{decodeHtmlEntities(block.title ?? '')}</p>
+                    {block.description && <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">{decodeHtmlEntities(block.description)}</p>}
+                    <p className="mt-1 truncate text-xs text-popup-faint">{safeHostname(block.url)}</p>
+                  </div>
+                  {arrowIcon}
+                </>
+              )}
             </div>
           </a>
         </div>
       )
+    }
     default:
       return null
   }
