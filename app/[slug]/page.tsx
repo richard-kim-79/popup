@@ -15,10 +15,13 @@ interface Props {
 function renderBlock(block: Block) {
   switch (block.type) {
     case 'h1':
+      if (!block.content?.trim()) return null
       return <h1 key={block.id} className="mb-4 text-4xl font-extrabold leading-snug text-popup-text">{block.content}</h1>
     case 'h2':
+      if (!block.content?.trim()) return null
       return <h2 key={block.id} className="mb-3 text-2xl font-bold leading-snug text-popup-text">{block.content}</h2>
     case 'text':
+      if (!block.content?.trim()) return null
       return <p key={block.id} className="mb-2 text-base leading-relaxed text-popup-text">{block.content}</p>
     case 'image':
       if (!block.url) return null

@@ -28,6 +28,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const [showShare, setShowShare] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const blocksRef   = useRef<Block[]>(initialBlocks)   // 최신 blocks를 ref로 추적
 
   const save = useCallback(async (newBlocks: Block[]) => {
     setSaveStatus('saving')
@@ -42,6 +43,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const handleUpdate = useCallback((id: string, patch: Partial<Block>) => {
     setBlocks((prev) => {
       const next = prev.map((b) => b.id === id ? { ...b, ...patch } : b) as Block[]
+      blocksRef.current = next
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => save(next), 300)
       return next
@@ -53,6 +55,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       if (prev.length <= 1) return prev
       const idx = prev.findIndex((b) => b.id === id)
       const next = prev.filter((b) => b.id !== id)
+      blocksRef.current = next
       setSelectedId(next[Math.max(0, idx - 1)]?.id ?? null)
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => save(next), 300)
@@ -66,6 +69,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       const idx = prev.findIndex((b) => b.id === id)
       const next = [...prev]
       next.splice(idx + 1, 0, nb)
+      blocksRef.current = next
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => save(next), 300)
       return next
@@ -82,6 +86,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
     const nb = { id: nanoid(6), type, ...defaults[type] } as Block
     setBlocks((prev) => {
       const next = [...prev, nb]
+      blocksRef.current = next
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => save(next), 300)
       return next
@@ -89,7 +94,20 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
     setTimeout(() => setSelectedId(nb.id), 0)
   }, [save])
 
-  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
+  // 언마운트 시: pending debounce가 있으면 즉시 flush (keepalive로 안전하게 전송)
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+        fetch(`/api/pages/${slug}/blocks`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ editToken, blocks: blocksRef.current }),
+          keepalive: true,
+        }).catch(() => {})
+      }
+    }
+  }, [slug, editToken])
 
   // 저장 상태 도트 색상
   const dotColor =
