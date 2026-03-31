@@ -77,6 +77,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
     const defaults: Record<BlockType, Partial<Block>> = {
       h1: { content: '' }, h2: { content: '' }, text: { content: '' },
       image: {}, button: { label: '클릭하세요' }, divider: {},
+      youtube: {}, link: {},
     }
     const nb = { id: nanoid(6), type, ...defaults[type] } as Block
     setBlocks((prev) => {

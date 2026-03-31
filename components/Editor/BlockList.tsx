@@ -1,10 +1,12 @@
 'use client'
 
-import type { Block, ButtonBlock, TextBlock } from '@/types'
+import type { Block, ButtonBlock, TextBlock, YoutubeBlock, LinkBlock } from '@/types'
 import TextBlockComp from '@/components/Blocks/TextBlock'
 import ImageBlockComp from '@/components/Blocks/ImageBlock'
 import ButtonBlockComp from '@/components/Blocks/ButtonBlock'
 import DividerBlockComp from '@/components/Blocks/DividerBlock'
+import YoutubeBlockComp from '@/components/Blocks/YoutubeBlock'
+import LinkBlockComp from '@/components/Blocks/LinkBlock'
 
 interface Props {
   blocks: Block[]
@@ -69,6 +71,30 @@ export default function BlockList({ blocks, slug, editToken, selectedId, onSelec
 
         if (block.type === 'divider') {
           return <DividerBlockComp key={block.id} id={block.id} onDelete={onDelete} />
+        }
+
+        if (block.type === 'youtube') {
+          return (
+            <div key={block.id} className="mb-4">
+              <YoutubeBlockComp
+                block={block as YoutubeBlock}
+                onUpdate={(id, patch) => onUpdate(id, patch)}
+                onDelete={onDelete}
+              />
+            </div>
+          )
+        }
+
+        if (block.type === 'link') {
+          return (
+            <div key={block.id} className="mb-4">
+              <LinkBlockComp
+                block={block as LinkBlock}
+                onUpdate={(id, patch) => onUpdate(id, patch)}
+                onDelete={onDelete}
+              />
+            </div>
+          )
         }
 
         return null

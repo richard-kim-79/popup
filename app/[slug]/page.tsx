@@ -4,7 +4,7 @@ import Logo from '@/components/UI/Logo'
 import ReportButton from '@/components/ReportButton'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { daysLeft } from '@/lib/slug'
-import type { Block } from '@/types'
+import type { Block, YoutubeBlock, LinkBlock } from '@/types'
 
 const REPORT_HIDE_THRESHOLD = 3
 
@@ -36,6 +36,39 @@ function renderBlock(block: Block) {
       )
     case 'divider':
       return <hr key={block.id} className="my-4 border-popup-border" />
+    case 'youtube':
+      if (!block.videoId) return null
+      return (
+        <div key={block.id} className="mb-4 aspect-video w-full overflow-hidden rounded-lg">
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${block.videoId}`}
+            title="YouTube"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="h-full w-full"
+          />
+        </div>
+      )
+    case 'link':
+      if (!block.url) return null
+      return (
+        <a key={block.id} href={block.url} target="_blank" rel="noopener noreferrer"
+          className="mb-4 block overflow-hidden rounded-lg border border-popup-border bg-popup-white transition-colors hover:border-popup-muted">
+          {block.image && (
+            <div className="aspect-[1.91/1] w-full overflow-hidden bg-popup-bg">
+              <img src={block.image} alt="" className="h-full w-full object-cover" />
+            </div>
+          )}
+          <div className="flex items-center gap-3 p-4">
+            {block.favicon && <img src={block.favicon} alt="" width={20} height={20} className="shrink-0 rounded" />}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-popup-text">{block.title}</p>
+              {block.description && <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">{block.description}</p>}
+              <p className="mt-1 truncate text-xs text-popup-faint">{new URL(block.url).hostname}</p>
+            </div>
+          </div>
+        </a>
+      )
     default:
       return null
   }

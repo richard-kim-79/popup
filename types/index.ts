@@ -4,7 +4,7 @@
 
 // --- Block Types ---
 
-export type BlockType = 'h1' | 'h2' | 'text' | 'image' | 'button' | 'divider'
+export type BlockType = 'h1' | 'h2' | 'text' | 'image' | 'button' | 'divider' | 'youtube' | 'link'
 
 export interface BaseBlock {
   id: string
@@ -32,7 +32,22 @@ export interface DividerBlock extends BaseBlock {
   type: 'divider'
 }
 
-export type Block = TextBlock | ImageBlock | ButtonBlock | DividerBlock
+export interface YoutubeBlock extends BaseBlock {
+  type: 'youtube'
+  url?: string      // YouTube URL
+  videoId?: string   // 추출된 video ID
+}
+
+export interface LinkBlock extends BaseBlock {
+  type: 'link'
+  url?: string
+  title?: string
+  description?: string
+  favicon?: string
+  image?: string
+}
+
+export type Block = TextBlock | ImageBlock | ButtonBlock | DividerBlock | YoutubeBlock | LinkBlock
 
 // --- Page ---
 
