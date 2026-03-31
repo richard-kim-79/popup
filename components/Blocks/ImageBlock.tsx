@@ -90,6 +90,16 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
 
     /* ── PDF ── */
     if (isPDF(block.url)) {
+      const w = block.width ?? 'full'
+      const pdfIcon = (
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+        </div>
+      )
       return (
         <div
           className="group relative"
@@ -99,20 +109,22 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
           <div className={`${widthClass} relative transition-all duration-200`}>
             <a href={block.url} target="_blank" rel="noreferrer"
               className="flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                  <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                  <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              {pdfIcon}
+              {/* 중·대: 파일명 표시 */}
+              {w !== 'small' && (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
+                  {/* 대: 설명 표시 */}
+                  {w === 'full' && (
+                    <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
+                  )}
+                </div>
+              )}
+              {w !== 'small' && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
+                  <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
-                <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
-              </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
-                <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              )}
             </a>
             {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
           </div>

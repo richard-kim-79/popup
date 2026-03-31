@@ -46,9 +46,10 @@ function renderBlock(block: Block) {
     case 'image': {
       if (!block.url) return null
       const displayName = block.filename ?? (() => { try { return decodeURIComponent(block.url!.split('/').pop()?.split('?')[0] ?? '파일') } catch { return '파일' } })()
-      if (block.url.toLowerCase().endsWith('.pdf'))
+      if (block.url.toLowerCase().endsWith('.pdf')) {
+        const w = block.width ?? 'full'
         return (
-          <div key={block.id} className={`mb-4 ${IMG_WIDTH[block.width ?? 'full']}`}>
+          <div key={block.id} className={`mb-4 ${IMG_WIDTH[w]}`}>
             <a href={block.url} target="_blank" rel="noreferrer"
               className="flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
@@ -58,13 +59,21 @@ function renderBlock(block: Block) {
                   <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
                 </svg>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
-                <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
-              </div>
+              {w !== 'small' && (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
+                  {w === 'full' && <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>}
+                </div>
+              )}
+              {w !== 'small' && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
+                  <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
             </a>
           </div>
         )
+      }
       return (
         <div key={block.id} className="mb-4">
           <div className={IMG_WIDTH[block.width ?? 'full']}>
