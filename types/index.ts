@@ -16,10 +16,13 @@ export interface TextBlock extends BaseBlock {
   content: string
 }
 
+export type ImageWidth = 'small' | 'medium' | 'full'
+
 export interface ImageBlock extends BaseBlock {
   type: 'image'
-  url?: string       // Supabase Storage public URL
-  filename?: string  // 원본 파일명 (한글/영문 포함)
+  url?: string         // Supabase Storage public URL
+  filename?: string    // 원본 파일명 (한글/영문 포함)
+  width?: ImageWidth   // 크기 프리셋 (기본: 'full')
   caption?: string
 }
 

@@ -40,6 +40,19 @@ const SNS_FALLBACKS: Record<string, (url: URL) => Partial<LinkMeta>> = {
   }),
 }
 
+/** HTML 엔티티 디코딩 (서버 사이드 safe) */
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+}
+
 function getAttr(html: string, property: string): string | null {
   // Handles both property="..." and name="..." with content in any order
   const re1 = new RegExp(`<meta\\s+(?:[^>]*?)(?:property|name)="${property}"\\s+content="([^"]*)"`, 'i')
@@ -130,8 +143,8 @@ export async function GET(
     }
 
     return NextResponse.json({
-      title: title.slice(0, 200),
-      description: description.slice(0, 300),
+      title: decodeHtmlEntities(title).slice(0, 200),
+      description: decodeHtmlEntities(description).slice(0, 300),
       favicon,
       image,
     })

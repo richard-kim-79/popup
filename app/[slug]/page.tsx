@@ -4,7 +4,22 @@ import Logo from '@/components/UI/Logo'
 import ReportButton from '@/components/ReportButton'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { daysLeft } from '@/lib/slug'
-import type { Block, YoutubeBlock, LinkBlock } from '@/types'
+import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
+
+/** HTML 엔티티 서버사이드 디코딩 */
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, c: string) => String.fromCharCode(Number(c)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)))
+}
+
+const IMG_WIDTH: Record<ImageWidth, string> = {
+  small:  'w-1/3',
+  medium: 'w-2/3',
+  full:   'w-full',
+}
 
 const REPORT_HIDE_THRESHOLD = 3
 
@@ -52,7 +67,9 @@ function renderBlock(block: Block) {
         )
       return (
         <div key={block.id} className="mb-4">
-          <img src={block.url} alt={displayName} className="w-full rounded-lg object-cover" />
+          <div className={IMG_WIDTH[block.width ?? 'full']}>
+            <img src={block.url} alt={displayName} className="w-full rounded-lg object-cover" />
+          </div>
           {block.filename && <p className="mt-1 truncate text-xs text-popup-faint" title={displayName}>{displayName}</p>}
         </div>
       )
@@ -92,8 +109,8 @@ function renderBlock(block: Block) {
           <div className="flex items-center gap-3 p-4">
             {block.favicon && <img src={block.favicon} alt="" width={20} height={20} className="shrink-0 rounded" />}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-popup-text">{block.title}</p>
-              {block.description && <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">{block.description}</p>}
+              <p className="truncate text-sm font-medium text-popup-text">{decodeHtmlEntities(block.title ?? '')}</p>
+              {block.description && <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">{decodeHtmlEntities(block.description)}</p>}
               <p className="mt-1 truncate text-xs text-popup-faint">{new URL(block.url).hostname}</p>
             </div>
           </div>

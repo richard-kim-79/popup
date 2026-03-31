@@ -9,6 +9,13 @@ interface Props {
   onDelete: (id: string) => void
 }
 
+/** 브라우저 textarea를 이용한 HTML 엔티티 디코딩 (클라이언트 전용) */
+function decodeEntities(str: string): string {
+  const el = document.createElement('textarea')
+  el.innerHTML = str
+  return el.value
+}
+
 export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [inputUrl, setInputUrl] = useState(block.url ?? '')
@@ -107,11 +114,11 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-popup-text">
-                {block.title}
+                {decodeEntities(block.title ?? '')}
               </p>
               {block.description && (
                 <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">
-                  {block.description}
+                  {decodeEntities(block.description)}
                 </p>
               )}
               <p className="mt-1 truncate text-xs text-popup-faint">

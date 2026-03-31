@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import type { ImageBlock as ImageBlockType } from '@/types'
+import type { ImageBlock as ImageBlockType, ImageWidth } from '@/types'
 
 interface Props {
   block: ImageBlockType
@@ -15,33 +15,68 @@ interface Props {
 function getFilename(url: string, fallback?: string): string {
   if (fallback) return fallback
   try {
-    const raw = url.split('/').pop()?.split('?')[0] ?? ''
-    // Supabase URL: slug/1234567890.ext 형태 → 타임스탬프 제거하고 원본명 불가
-    // 그냥 경로 끝부분만 디코딩해서 표시
-    return decodeURIComponent(raw)
+    return decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? '파일')
   } catch {
     return url.split('/').pop() ?? '파일'
   }
 }
 
-/** MIME 판별 */
 function isVideo(url: string) { return /\.(mp4|mov)$/i.test(url) }
 function isPDF(url: string)   { return url.toLowerCase().endsWith('.pdf') }
 
+/** 크기 프리셋 */
+const SIZE_OPTIONS: { key: ImageWidth; label: string; widthClass: string; icon: string }[] = [
+  { key: 'small',  label: '소',  widthClass: 'w-1/3',  icon: '▬' },
+  { key: 'medium', label: '중',  widthClass: 'w-2/3',  icon: '▬▬' },
+  { key: 'full',   label: '대',  widthClass: 'w-full', icon: '▬▬▬' },
+]
+
+function getWidthClass(width?: ImageWidth): string {
+  return SIZE_OPTIONS.find(s => s.key === width)?.widthClass ?? 'w-full'
+}
+
+/** 크기 조절 버튼 바 */
+function SizeBar({ current, onChange }: { current?: ImageWidth; onChange: (w: ImageWidth) => void }) {
+  const active = current ?? 'full'
+  return (
+    <div className="mt-2 flex items-center gap-1">
+      {SIZE_OPTIONS.map(({ key, label }) => (
+        <button
+          key={key}
+          onClick={(e) => { e.stopPropagation(); onChange(key) }}
+          title={label}
+          className={`flex h-6 items-center gap-1 rounded px-2 text-xs transition-colors ${
+            active === key
+              ? 'bg-popup-accent text-white'
+              : 'bg-popup-surface text-popup-muted hover:bg-popup-border'
+          }`}
+        >
+          {/* 시각적 크기 표현: 막대 개수 */}
+          <span className="flex gap-0.5">
+            {Array.from({ length: key === 'small' ? 1 : key === 'medium' ? 2 : 3 }).map((_, i) => (
+              <span key={i} className={`block rounded-sm ${active === key ? 'bg-white' : 'bg-current'}`}
+                style={{ width: 4, height: 8, opacity: active === key ? 1 : 0.5 }} />
+            ))}
+          </span>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading]       = useState(false)
-  const [progress, setProgress]         = useState(0)
-  const [pendingName, setPendingName]   = useState('')  // 업로드 중 파일명 미리보기
+  const [uploading, setUploading]     = useState(false)
+  const [progress, setProgress]       = useState(0)
+  const [pendingName, setPendingName] = useState('')
 
   const handleFile = async (file: File) => {
     setPendingName(file.name)
     setUploading(true)
     setProgress(10)
-
     const form = new FormData()
     form.append('file', file)
-
     try {
       const res = await fetch(`/api/pages/${slug}/upload`, {
         method: 'POST',
@@ -51,9 +86,8 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       setProgress(90)
       const data = await res.json() as { url?: string; filename?: string; error?: string }
       setProgress(100)
-
       if (res.ok && data.url) {
-        onUpdate(block.id, { url: data.url, filename: data.filename ?? file.name })
+        onUpdate(block.id, { url: data.url, filename: data.filename ?? file.name, width: 'full' })
       } else {
         alert(data.error ?? '업로드에 실패했습니다.')
       }
@@ -66,20 +100,14 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
 
   /* ── 업로드 완료 상태 ── */
   if (block.url) {
-    const displayName = block.filename
-      ? block.filename
-      : getFilename(block.url)
+    const displayName = getFilename(block.url, block.filename)
+    const widthClass  = getWidthClass(block.width)
 
     if (isPDF(block.url)) {
       return (
         <div className="group relative">
-          <a
-            href={block.url}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted"
-          >
-            {/* PDF 아이콘 */}
+          <a href={block.url} target="_blank" rel="noreferrer"
+            className="flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
@@ -88,19 +116,15 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-popup-text" title={displayName}>
-                {displayName}
-              </p>
+              <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
               <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
               <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </a>
-          <button
-            onClick={() => onDelete(block.id)}
-            className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
-          >
+          <button onClick={() => onDelete(block.id)}
+            className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
             삭제
           </button>
         </div>
@@ -111,49 +135,52 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       return (
         <div className="group relative">
           <video src={block.url} controls className="w-full rounded-lg" />
-          {/* 파일명 배지 */}
           <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
               <rect x="2" y="2" width="20" height="20" rx="4" stroke="currentColor" strokeWidth="1.5" />
               <path d="M10 8.5l6 3.5-6 3.5V8.5z" fill="currentColor" opacity="0.5" />
             </svg>
-            <span className="max-w-full truncate text-xs text-popup-faint" title={displayName}>
-              {displayName}
-            </span>
+            <span className="max-w-full truncate text-xs text-popup-faint" title={displayName}>{displayName}</span>
           </div>
-          <button
-            onClick={() => onDelete(block.id)}
-            className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
-          >
+          <button onClick={() => onDelete(block.id)}
+            className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
             삭제
           </button>
         </div>
       )
     }
 
-    // 이미지
+    /* ── 이미지: 크기 조절 UI 포함 ── */
     return (
       <div className="group relative">
-        <img
-          src={block.url}
-          alt={displayName}
-          className="w-full rounded-lg object-cover"
-        />
-        {/* 파일명 배지 */}
-        <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
-            <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
-            <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M3 15l5-5 4 4 3-2 6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="max-w-full truncate text-xs text-popup-faint" title={displayName}>
-            {displayName}
-          </span>
+        {/* 이미지 — width 프리셋 적용 */}
+        <div className={`${widthClass} transition-all duration-200`}>
+          <img
+            src={block.url}
+            alt={displayName}
+            className="w-full rounded-lg object-cover"
+          />
         </div>
-        <button
-          onClick={() => onDelete(block.id)}
-          className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
-        >
+
+        {/* 파일명 + 크기 버튼 바 (항상 표시) */}
+        <div className="flex items-center justify-between px-0.5">
+          <div className="flex items-center gap-1.5">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
+              <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M3 15l5-5 4 4 3-2 6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="max-w-[180px] truncate text-xs text-popup-faint" title={displayName}>{displayName}</span>
+          </div>
+          {/* 크기 조절 버튼 */}
+          <SizeBar
+            current={block.width}
+            onChange={(w) => onUpdate(block.id, { width: w })}
+          />
+        </div>
+
+        <button onClick={() => onDelete(block.id)}
+          className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
           삭제
         </button>
       </div>
@@ -168,17 +195,13 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && !uploading) handleFile(f) }}
     >
-      <input
-        ref={inputRef}
-        type="file"
+      <input ref={inputRef} type="file"
         accept="image/*,video/mp4,video/quicktime,application/pdf"
         className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
-      />
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
 
       {uploading ? (
         <>
-          {/* 파일명 표시 */}
           <p className="mb-3 max-w-full truncate text-xs font-medium text-popup-muted" title={pendingName}>
             {pendingName}
           </p>
@@ -199,10 +222,8 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
         </>
       )}
 
-      <button
-        onClick={(e) => { e.stopPropagation(); onDelete(block.id) }}
-        className="absolute right-2 top-2 text-xs text-popup-muted opacity-0 transition-opacity group-hover:opacity-100"
-      >
+      <button onClick={(e) => { e.stopPropagation(); onDelete(block.id) }}
+        className="absolute right-2 top-2 text-xs text-popup-muted opacity-0 transition-opacity group-hover:opacity-100">
         삭제
       </button>
     </div>
