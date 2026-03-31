@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import type { ImageBlock as ImageBlockType, ImageWidth } from '@/types'
 
 interface Props {
@@ -25,44 +25,14 @@ function isVideo(url: string) { return /\.(mp4|mov)$/i.test(url) }
 function isPDF(url: string)   { return url.toLowerCase().endsWith('.pdf') }
 
 /** 크기 프리셋 */
-const SIZE_OPTIONS: { key: ImageWidth; label: string; widthClass: string; icon: string }[] = [
-  { key: 'small',  label: '소',  widthClass: 'w-1/3',  icon: '▬' },
-  { key: 'medium', label: '중',  widthClass: 'w-2/3',  icon: '▬▬' },
-  { key: 'full',   label: '대',  widthClass: 'w-full', icon: '▬▬▬' },
+const SIZE_OPTIONS: { key: ImageWidth; label: string; widthClass: string; bars: number }[] = [
+  { key: 'small',  label: '소',  widthClass: 'w-1/3',  bars: 1 },
+  { key: 'medium', label: '중',  widthClass: 'w-2/3',  bars: 2 },
+  { key: 'full',   label: '대',  widthClass: 'w-full', bars: 3 },
 ]
 
 function getWidthClass(width?: ImageWidth): string {
   return SIZE_OPTIONS.find(s => s.key === width)?.widthClass ?? 'w-full'
-}
-
-/** 크기 조절 버튼 바 */
-function SizeBar({ current, onChange }: { current?: ImageWidth; onChange: (w: ImageWidth) => void }) {
-  const active = current ?? 'full'
-  return (
-    <div className="mt-2 flex items-center gap-1">
-      {SIZE_OPTIONS.map(({ key, label }) => (
-        <button
-          key={key}
-          onClick={(e) => { e.stopPropagation(); onChange(key) }}
-          title={label}
-          className={`flex h-6 items-center gap-1 rounded px-2 text-xs transition-colors ${
-            active === key
-              ? 'bg-popup-accent text-white'
-              : 'bg-popup-surface text-popup-muted hover:bg-popup-border'
-          }`}
-        >
-          {/* 시각적 크기 표현: 막대 개수 */}
-          <span className="flex gap-0.5">
-            {Array.from({ length: key === 'small' ? 1 : key === 'medium' ? 2 : 3 }).map((_, i) => (
-              <span key={i} className={`block rounded-sm ${active === key ? 'bg-white' : 'bg-current'}`}
-                style={{ width: 4, height: 8, opacity: active === key ? 1 : 0.5 }} />
-            ))}
-          </span>
-          {label}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete }: Props) {
@@ -70,6 +40,12 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
   const [uploading, setUploading]     = useState(false)
   const [progress, setProgress]       = useState(0)
   const [pendingName, setPendingName] = useState('')
+  const [showSize, setShowSize]       = useState(false)   // hover 시 크기 패널 표시
+
+  const handleSizeChange = useCallback((w: ImageWidth) => {
+    onUpdate(block.id, { width: w })
+    setShowSize(false)  // 선택 후 즉시 숨김
+  }, [block.id, onUpdate])
 
   const handleFile = async (file: File) => {
     setPendingName(file.name)
@@ -150,33 +126,72 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       )
     }
 
-    /* ── 이미지: 크기 조절 UI 포함 ── */
+    /* ── 이미지: hover 크기 조절 오버레이 ── */
     return (
-      <div className="group relative">
-        {/* 이미지 — width 프리셋 적용 */}
+      <div
+        className="group relative"
+        onMouseEnter={() => setShowSize(true)}
+        onMouseLeave={() => setShowSize(false)}
+      >
+        {/* 이미지 */}
         <div className={`${widthClass} transition-all duration-200`}>
           <img
             src={block.url}
             alt={displayName}
             className="w-full rounded-lg object-cover"
           />
+
+          {/* 크기 조절 오버레이 — hover 시 등장, 선택 후 사라짐 */}
+          {showSize && (
+            <div className="absolute inset-0 flex items-end justify-center pb-3 pointer-events-none">
+              <div
+                className="pointer-events-auto flex items-center gap-1 rounded-full bg-black/60 px-2 py-1.5 backdrop-blur-sm"
+                onMouseEnter={(e) => e.stopPropagation()}
+              >
+                {SIZE_OPTIONS.map(({ key, label, bars }) => {
+                  const active = (block.width ?? 'full') === key
+                  return (
+                    <button
+                      key={key}
+                      onClick={(e) => { e.stopPropagation(); handleSizeChange(key) }}
+                      title={label}
+                      className={`flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-all ${
+                        active
+                          ? 'bg-white text-black'
+                          : 'text-white/80 hover:bg-white/20'
+                      }`}
+                    >
+                      <span className="flex gap-[3px] items-end">
+                        {Array.from({ length: bars }).map((_, i) => (
+                          <span
+                            key={i}
+                            className="block rounded-sm"
+                            style={{
+                              width: 3,
+                              height: 4 + i * 3,
+                              background: active ? 'black' : 'white',
+                              opacity: active ? 1 : 0.8,
+                            }}
+                          />
+                        ))}
+                      </span>
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* 파일명 + 크기 버튼 바 (항상 표시) */}
-        <div className="flex items-center justify-between px-0.5">
-          <div className="flex items-center gap-1.5">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
-              <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
-              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.2" />
-              <path d="M3 15l5-5 4 4 3-2 6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="max-w-[180px] truncate text-xs text-popup-faint" title={displayName}>{displayName}</span>
-          </div>
-          {/* 크기 조절 버튼 */}
-          <SizeBar
-            current={block.width}
-            onChange={(w) => onUpdate(block.id, { width: w })}
-          />
+        {/* 파일명 */}
+        <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
+            <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
+            <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M3 15l5-5 4 4 3-2 6 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="max-w-[200px] truncate text-xs text-popup-faint" title={displayName}>{displayName}</span>
         </div>
 
         <button onClick={() => onDelete(block.id)}
