@@ -19,6 +19,7 @@ export interface TextBlock extends BaseBlock {
 export interface ImageBlock extends BaseBlock {
   type: 'image'
   url?: string       // Supabase Storage public URL
+  filename?: string  // 원본 파일명 (한글/영문 포함)
   caption?: string
 }
 
@@ -118,6 +119,7 @@ export interface VerifyPinResponse {
 
 export interface UploadResponse {
   url: string
+  filename: string
 }
 
 export interface ApiError {

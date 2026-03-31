@@ -1,6 +1,6 @@
 'use client'
 
-import type { Block, ButtonBlock, TextBlock, YoutubeBlock, LinkBlock } from '@/types'
+import type { Block, ButtonBlock, ImageBlock, TextBlock, YoutubeBlock, LinkBlock } from '@/types'
 import TextBlockComp from '@/components/Blocks/TextBlock'
 import ImageBlockComp from '@/components/Blocks/ImageBlock'
 import ButtonBlockComp from '@/components/Blocks/ButtonBlock'
@@ -47,7 +47,7 @@ export default function BlockList({ blocks, slug, editToken, selectedId, onSelec
                 block={block}
                 slug={slug}
                 editToken={editToken}
-                onUpdate={(id, url) => onUpdate(id, { url })}
+                onUpdate={(id, patch) => onUpdate(id, patch as Partial<ImageBlock>)}
                 onDelete={onDelete}
               />
             </div>

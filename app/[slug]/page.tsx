@@ -23,13 +23,40 @@ function renderBlock(block: Block) {
     case 'text':
       if (!block.content?.trim()) return null
       return <p key={block.id} className="mb-2 text-base leading-relaxed text-popup-text">{block.content}</p>
-    case 'image':
+    case 'image': {
       if (!block.url) return null
+      const displayName = block.filename ?? (() => { try { return decodeURIComponent(block.url!.split('/').pop()?.split('?')[0] ?? '파일') } catch { return '파일' } })()
       if (block.url.match(/\.(mp4|mov)$/i))
-        return <video key={block.id} src={block.url} controls className="mb-4 w-full rounded-lg" />
-      if (block.url.endsWith('.pdf'))
-        return <a key={block.id} href={block.url} target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2 rounded-lg border border-popup-border p-4 text-sm text-popup-accent">📄 PDF 파일 열기</a>
-      return <img key={block.id} src={block.url} alt="" className="mb-4 w-full rounded-lg object-cover" />
+        return (
+          <div key={block.id} className="mb-4">
+            <video src={block.url} controls className="w-full rounded-lg" />
+            <p className="mt-1 truncate text-xs text-popup-faint" title={displayName}>{displayName}</p>
+          </div>
+        )
+      if (block.url.toLowerCase().endsWith('.pdf'))
+        return (
+          <a key={block.id} href={block.url} target="_blank" rel="noreferrer"
+            className="mb-4 flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
+              <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
+            </div>
+          </a>
+        )
+      return (
+        <div key={block.id} className="mb-4">
+          <img src={block.url} alt={displayName} className="w-full rounded-lg object-cover" />
+          {block.filename && <p className="mt-1 truncate text-xs text-popup-faint" title={displayName}>{displayName}</p>}
+        </div>
+      )
+    }
     case 'button':
       return (
         <a key={block.id} href={block.href ?? '#'} target={block.href ? '_blank' : undefined} rel="noreferrer"

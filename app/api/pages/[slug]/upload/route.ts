@@ -65,5 +65,5 @@ export async function POST(
   }
 
   const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
-  return NextResponse.json({ url: publicUrl }, { status: 201 })
+  return NextResponse.json({ url: publicUrl, filename: file.name }, { status: 201 })
 }
