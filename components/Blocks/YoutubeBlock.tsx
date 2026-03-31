@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
-import type { YoutubeBlock as YoutubeBlockType } from '@/types'
+import { useRef, useState, useCallback, useEffect } from 'react'
+import type { YoutubeBlock as YoutubeBlockType, ImageWidth } from '@/types'
+import SizeOverlay, { getWidthClass } from './SizeOverlay'
 
 interface Props {
   block: YoutubeBlockType
@@ -24,6 +25,7 @@ export default function YoutubeBlock({ block, onUpdate, onDelete }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [inputUrl, setInputUrl] = useState(block.url ?? '')
   const [error, setError] = useState('')
+  const [showSize, setShowSize] = useState(false)
 
   useEffect(() => {
     if (!block.videoId && inputRef.current) inputRef.current.focus()
@@ -39,23 +41,36 @@ export default function YoutubeBlock({ block, onUpdate, onDelete }: Props) {
     }
   }
 
+  const handleSizeChange = useCallback((w: ImageWidth) => {
+    onUpdate(block.id, { width: w })
+    setShowSize(false)
+  }, [block.id, onUpdate])
+
   if (block.videoId) {
+    const widthClass = getWidthClass(block.width)
     return (
-      <div className="group relative">
-        <div className="aspect-video w-full overflow-hidden rounded-lg">
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${block.videoId}`}
-            title="YouTube"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="h-full w-full"
-          />
+      <div
+        className="group relative"
+        onMouseEnter={() => setShowSize(true)}
+        onMouseLeave={() => setShowSize(false)}
+      >
+        <div className={`${widthClass} relative transition-all duration-200`}>
+          <div className="aspect-video w-full overflow-hidden rounded-lg">
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${block.videoId}`}
+              title="YouTube"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="h-full w-full"
+            />
+          </div>
+          {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
         </div>
         <button
           onClick={() => onDelete(block.id)}
           className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
         >
-          ×
+          삭제
         </button>
       </div>
     )

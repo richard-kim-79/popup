@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback } from 'react'
 import type { ImageBlock as ImageBlockType, ImageWidth } from '@/types'
+import SizeOverlay, { getWidthClass } from './SizeOverlay'
 
 interface Props {
   block: ImageBlockType
@@ -24,27 +25,16 @@ function getFilename(url: string, fallback?: string): string {
 function isVideo(url: string) { return /\.(mp4|mov)$/i.test(url) }
 function isPDF(url: string)   { return url.toLowerCase().endsWith('.pdf') }
 
-/** 크기 프리셋 */
-const SIZE_OPTIONS: { key: ImageWidth; label: string; widthClass: string; bars: number }[] = [
-  { key: 'small',  label: '소',  widthClass: 'w-1/3',  bars: 1 },
-  { key: 'medium', label: '중',  widthClass: 'w-2/3',  bars: 2 },
-  { key: 'full',   label: '대',  widthClass: 'w-full', bars: 3 },
-]
-
-function getWidthClass(width?: ImageWidth): string {
-  return SIZE_OPTIONS.find(s => s.key === width)?.widthClass ?? 'w-full'
-}
-
 export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading]     = useState(false)
   const [progress, setProgress]       = useState(0)
   const [pendingName, setPendingName] = useState('')
-  const [showSize, setShowSize]       = useState(false)   // hover 시 크기 패널 표시
+  const [showSize, setShowSize]       = useState(false)
 
   const handleSizeChange = useCallback((w: ImageWidth) => {
     onUpdate(block.id, { width: w })
-    setShowSize(false)  // 선택 후 즉시 숨김
+    setShowSize(false)
   }, [block.id, onUpdate])
 
   const handleFile = async (file: File) => {
@@ -79,26 +69,34 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
     const displayName = getFilename(block.url, block.filename)
     const widthClass  = getWidthClass(block.width)
 
+    /* ── PDF ── */
     if (isPDF(block.url)) {
       return (
-        <div className="group relative">
-          <a href={block.url} target="_blank" rel="noreferrer"
-            className="flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <div
+          className="group relative"
+          onMouseEnter={() => setShowSize(true)}
+          onMouseLeave={() => setShowSize(false)}
+        >
+          <div className={`${widthClass} relative transition-all duration-200`}>
+            <a href={block.url} target="_blank" rel="noreferrer"
+              className="flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
+                <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
+                <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
-              <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
-              <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </a>
+            </a>
+            {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
+          </div>
           <button onClick={() => onDelete(block.id)}
             className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
             삭제
@@ -107,10 +105,18 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       )
     }
 
+    /* ── 동영상 ── */
     if (isVideo(block.url)) {
       return (
-        <div className="group relative">
-          <video src={block.url} controls className="w-full rounded-lg" />
+        <div
+          className="group relative"
+          onMouseEnter={() => setShowSize(true)}
+          onMouseLeave={() => setShowSize(false)}
+        >
+          <div className={`${widthClass} relative transition-all duration-200`}>
+            <video src={block.url} controls className="w-full rounded-lg" />
+            {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
+          </div>
           <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
               <rect x="2" y="2" width="20" height="20" rx="4" stroke="currentColor" strokeWidth="1.5" />
@@ -126,65 +132,22 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       )
     }
 
-    /* ── 이미지: hover 크기 조절 오버레이 ── */
+    /* ── 이미지 ── */
     return (
       <div
         className="group relative"
         onMouseEnter={() => setShowSize(true)}
         onMouseLeave={() => setShowSize(false)}
       >
-        {/* 이미지 */}
-        <div className={`${widthClass} transition-all duration-200`}>
+        <div className={`${widthClass} relative transition-all duration-200`}>
           <img
             src={block.url}
             alt={displayName}
             className="w-full rounded-lg object-cover"
           />
-
-          {/* 크기 조절 오버레이 — hover 시 등장, 선택 후 사라짐 */}
-          {showSize && (
-            <div className="absolute inset-0 flex items-end justify-center pb-3 pointer-events-none">
-              <div
-                className="pointer-events-auto flex items-center gap-1 rounded-full bg-black/60 px-2 py-1.5 backdrop-blur-sm"
-                onMouseEnter={(e) => e.stopPropagation()}
-              >
-                {SIZE_OPTIONS.map(({ key, label, bars }) => {
-                  const active = (block.width ?? 'full') === key
-                  return (
-                    <button
-                      key={key}
-                      onClick={(e) => { e.stopPropagation(); handleSizeChange(key) }}
-                      title={label}
-                      className={`flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-all ${
-                        active
-                          ? 'bg-white text-black'
-                          : 'text-white/80 hover:bg-white/20'
-                      }`}
-                    >
-                      <span className="flex gap-[3px] items-end">
-                        {Array.from({ length: bars }).map((_, i) => (
-                          <span
-                            key={i}
-                            className="block rounded-sm"
-                            style={{
-                              width: 3,
-                              height: 4 + i * 3,
-                              background: active ? 'black' : 'white',
-                              opacity: active ? 1 : 0.8,
-                            }}
-                          />
-                        ))}
-                      </span>
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+          {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
         </div>
 
-        {/* 파일명 */}
         <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />

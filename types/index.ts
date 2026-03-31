@@ -39,7 +39,8 @@ export interface DividerBlock extends BaseBlock {
 export interface YoutubeBlock extends BaseBlock {
   type: 'youtube'
   url?: string      // YouTube URL
-  videoId?: string   // 추출된 video ID
+  videoId?: string  // 추출된 video ID
+  width?: ImageWidth
 }
 
 export interface LinkBlock extends BaseBlock {
@@ -49,6 +50,7 @@ export interface LinkBlock extends BaseBlock {
   description?: string
   favicon?: string
   image?: string
+  width?: ImageWidth
 }
 
 export type Block = TextBlock | ImageBlock | ButtonBlock | DividerBlock | YoutubeBlock | LinkBlock

@@ -43,27 +43,29 @@ function renderBlock(block: Block) {
       const displayName = block.filename ?? (() => { try { return decodeURIComponent(block.url!.split('/').pop()?.split('?')[0] ?? '파일') } catch { return '파일' } })()
       if (block.url.match(/\.(mp4|mov)$/i))
         return (
-          <div key={block.id} className="mb-4">
+          <div key={block.id} className={`mb-4 ${IMG_WIDTH[block.width ?? 'full']}`}>
             <video src={block.url} controls className="w-full rounded-lg" />
             <p className="mt-1 truncate text-xs text-popup-faint" title={displayName}>{displayName}</p>
           </div>
         )
       if (block.url.toLowerCase().endsWith('.pdf'))
         return (
-          <a key={block.id} href={block.url} target="_blank" rel="noreferrer"
-            className="mb-4 flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
-              <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
-            </div>
-          </a>
+          <div key={block.id} className={`mb-4 ${IMG_WIDTH[block.width ?? 'full']}`}>
+            <a href={block.url} target="_blank" rel="noreferrer"
+              className="flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
+                <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
+              </div>
+            </a>
+          </div>
         )
       return (
         <div key={block.id} className="mb-4">
@@ -86,35 +88,39 @@ function renderBlock(block: Block) {
     case 'youtube':
       if (!block.videoId) return null
       return (
-        <div key={block.id} className="mb-4 aspect-video w-full overflow-hidden rounded-lg">
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${block.videoId}`}
-            title="YouTube"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="h-full w-full"
-          />
+        <div key={block.id} className={`mb-4 ${IMG_WIDTH[block.width ?? 'full']}`}>
+          <div className="aspect-video w-full overflow-hidden rounded-lg">
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${block.videoId}`}
+              title="YouTube"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="h-full w-full"
+            />
+          </div>
         </div>
       )
     case 'link':
       if (!block.url) return null
       return (
-        <a key={block.id} href={block.url} target="_blank" rel="noopener noreferrer"
-          className="mb-4 block overflow-hidden rounded-lg border border-popup-border bg-popup-white transition-colors hover:border-popup-muted">
-          {block.image && (
-            <div className="aspect-[1.91/1] w-full overflow-hidden bg-popup-bg">
-              <img src={block.image} alt="" className="h-full w-full object-cover" />
+        <div key={block.id} className={`mb-4 ${IMG_WIDTH[block.width ?? 'full']}`}>
+          <a href={block.url} target="_blank" rel="noopener noreferrer"
+            className="block overflow-hidden rounded-lg border border-popup-border bg-popup-white transition-colors hover:border-popup-muted">
+            {block.image && (
+              <div className="aspect-[1.91/1] w-full overflow-hidden bg-popup-bg">
+                <img src={block.image} alt="" className="h-full w-full object-cover" />
+              </div>
+            )}
+            <div className="flex items-center gap-3 p-4">
+              {block.favicon && <img src={block.favicon} alt="" width={20} height={20} className="shrink-0 rounded" />}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-popup-text">{decodeHtmlEntities(block.title ?? '')}</p>
+                {block.description && <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">{decodeHtmlEntities(block.description)}</p>}
+                <p className="mt-1 truncate text-xs text-popup-faint">{new URL(block.url).hostname}</p>
+              </div>
             </div>
-          )}
-          <div className="flex items-center gap-3 p-4">
-            {block.favicon && <img src={block.favicon} alt="" width={20} height={20} className="shrink-0 rounded" />}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-popup-text">{decodeHtmlEntities(block.title ?? '')}</p>
-              {block.description && <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">{decodeHtmlEntities(block.description)}</p>}
-              <p className="mt-1 truncate text-xs text-popup-faint">{new URL(block.url).hostname}</p>
-            </div>
-          </div>
-        </a>
+          </a>
+        </div>
       )
     default:
       return null

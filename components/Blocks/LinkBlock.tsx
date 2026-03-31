@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
-import type { LinkBlock as LinkBlockType } from '@/types'
+import { useRef, useState, useCallback, useEffect } from 'react'
+import type { LinkBlock as LinkBlockType, ImageWidth } from '@/types'
+import SizeOverlay, { getWidthClass } from './SizeOverlay'
 
 interface Props {
   block: LinkBlockType
@@ -21,6 +22,7 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
   const [inputUrl, setInputUrl] = useState(block.url ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showSize, setShowSize] = useState(false)
 
   useEffect(() => {
     if (!block.url && inputRef.current) inputRef.current.focus()
@@ -76,64 +78,78 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
     }
   }
 
+  const handleSizeChange = useCallback((w: ImageWidth) => {
+    onUpdate(block.id, { width: w })
+    setShowSize(false)
+  }, [block.id, onUpdate])
+
   // Rendered preview card
   if (block.url && block.title) {
     const hasImage = !!block.image
+    const widthClass = getWidthClass(block.width)
 
     return (
-      <div className="group relative">
-        <a
-          href={block.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block overflow-hidden rounded-lg border border-popup-border bg-popup-white transition-colors hover:border-popup-muted"
-        >
-          {/* OG Image */}
-          {hasImage && (
-            <div className="relative aspect-[1.91/1] w-full overflow-hidden bg-popup-bg">
-              <img
-                src={block.image}
-                alt=""
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none'
-                }}
-              />
-            </div>
-          )}
-          {/* Text content */}
-          <div className="flex items-center gap-3 p-4">
-            {block.favicon && (
-              <img
-                src={block.favicon}
-                alt=""
-                width={20}
-                height={20}
-                className="shrink-0 rounded"
-              />
+      <div
+        className="group relative"
+        onMouseEnter={() => setShowSize(true)}
+        onMouseLeave={() => setShowSize(false)}
+      >
+        <div className={`${widthClass} relative transition-all duration-200`}>
+          <a
+            href={block.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block overflow-hidden rounded-lg border border-popup-border bg-popup-white transition-colors hover:border-popup-muted"
+          >
+            {/* OG Image */}
+            {hasImage && (
+              <div className="relative aspect-[1.91/1] w-full overflow-hidden bg-popup-bg">
+                <img
+                  src={block.image}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              </div>
             )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-popup-text">
-                {decodeEntities(block.title ?? '')}
-              </p>
-              {block.description && (
-                <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">
-                  {decodeEntities(block.description)}
-                </p>
+            {/* Text content */}
+            <div className="flex items-center gap-3 p-4">
+              {block.favicon && (
+                <img
+                  src={block.favicon}
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="shrink-0 rounded"
+                />
               )}
-              <p className="mt-1 truncate text-xs text-popup-faint">
-                {new URL(block.url).hostname}
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-popup-text">
+                  {decodeEntities(block.title ?? '')}
+                </p>
+                {block.description && (
+                  <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">
+                    {decodeEntities(block.description)}
+                  </p>
+                )}
+                <p className="mt-1 truncate text-xs text-popup-faint">
+                  {new URL(block.url).hostname}
+                </p>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
+                <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
-              <path d="M7 17L17 7M17 7H7M17 7V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-        </a>
+          </a>
 
-        {/* hover 시 컨트롤 버튼들 */}
+          {/* 크기 조절 오버레이 */}
+          {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
+        </div>
+
+        {/* hover 시 수정·삭제 버튼 */}
         <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          {/* URL 변경 */}
           <button
             onClick={(e) => {
               e.preventDefault()
@@ -146,7 +162,6 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
           >
             수정
           </button>
-          {/* 삭제 */}
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(block.id) }}
             className="rounded bg-black/50 px-2 py-0.5 text-xs text-white hover:bg-black/70"
