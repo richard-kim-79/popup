@@ -9,7 +9,7 @@ const ALLOWED_MIME = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   'application/pdf',
 ]
-const MAX_SIZE = 20 * 1024 * 1024 // 20MB
+const MAX_SIZE = 500 * 1024 * 1024 // 500MB
 const BUCKET = 'media'
 
 async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {
