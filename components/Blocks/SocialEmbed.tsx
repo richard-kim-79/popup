@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, Suspense } from 'react'
+import { Tweet } from 'react-tweet'
 import type { SocialEmbedType } from '@/types'
 
 interface Props {
@@ -11,7 +12,6 @@ interface Props {
 
 declare global {
   interface Window {
-    twttr?: { widgets: { load: (el: HTMLElement | null) => void } }
     instgrm?: { Embeds: { process: () => void } }
   }
 }
@@ -20,19 +20,6 @@ export default function SocialEmbed({ embedType, embedId, url }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (embedType === 'twitter') {
-      if (window.twttr?.widgets) {
-        window.twttr.widgets.load(ref.current)
-        return
-      }
-      if (!document.querySelector('script[src*="platform.twitter.com/widgets.js"]')) {
-        const script = document.createElement('script')
-        script.src = 'https://platform.twitter.com/widgets.js'
-        script.async = true
-        document.head.appendChild(script)
-      }
-    }
-
     if (embedType === 'instagram') {
       if (window.instgrm?.Embeds) {
         window.instgrm.Embeds.process()
@@ -47,16 +34,20 @@ export default function SocialEmbed({ embedType, embedId, url }: Props) {
     }
   }, [embedType, embedId])
 
+  /* ── Twitter — react-tweet (스크립트 불필요, SSR 지원) ── */
   if (embedType === 'twitter') {
     return (
-      <div ref={ref} className="flex justify-center py-2">
-        <blockquote className="twitter-tweet" data-dnt="true" data-lang="ko">
-          <a href={url} />
-        </blockquote>
+      <div className="flex justify-center py-2 [&>div]:!max-w-[550px] [&>div]:w-full">
+        <Suspense fallback={
+          <div className="h-32 w-[550px] max-w-full animate-pulse rounded-2xl bg-popup-border" />
+        }>
+          <Tweet id={embedId} />
+        </Suspense>
       </div>
     )
   }
 
+  /* ── Instagram ── */
   if (embedType === 'instagram') {
     return (
       <div ref={ref} className="flex justify-center py-2">
@@ -70,6 +61,7 @@ export default function SocialEmbed({ embedType, embedId, url }: Props) {
     )
   }
 
+  /* ── TikTok ── */
   if (embedType === 'tiktok') {
     return (
       <div className="flex justify-center py-2">
