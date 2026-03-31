@@ -39,23 +39,43 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
   const handleFile = async (file: File) => {
     setPendingName(file.name)
     setUploading(true)
-    setProgress(10)
-    const form = new FormData()
-    form.append('file', file)
+    setProgress(0)
+
     try {
-      const res = await fetch(`/api/pages/${slug}/upload`, {
+      // 1단계: 서버에서 Signed URL 발급 (editToken 검증 + MIME 확인)
+      const tokenRes = await fetch(`/api/pages/${slug}/upload`, {
         method: 'POST',
-        headers: { 'x-edit-token': editToken },
-        body: form,
+        headers: {
+          'x-edit-token': editToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ filename: file.name, mimeType: file.type, size: file.size }),
       })
-      setProgress(90)
-      const data = await res.json() as { url?: string; filename?: string; error?: string }
-      setProgress(100)
-      if (res.ok && data.url) {
-        onUpdate(block.id, { url: data.url, filename: data.filename ?? file.name, width: 'full' })
-      } else {
-        alert(data.error ?? '업로드에 실패했습니다.')
+      const tokenData = await tokenRes.json() as { signedUrl?: string; publicUrl?: string; filename?: string; error?: string }
+      if (!tokenRes.ok || !tokenData.signedUrl) {
+        alert(tokenData.error ?? '업로드 준비에 실패했습니다.')
+        return
       }
+
+      // 2단계: 클라이언트 → Supabase 직접 PUT (실제 진행률)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', tokenData.signedUrl!)
+        xhr.setRequestHeader('Content-Type', file.type)
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100))
+        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve()
+          else reject(new Error(`업로드 실패 (${xhr.status})`))
+        }
+        xhr.onerror = () => reject(new Error('네트워크 오류'))
+        xhr.send(file)
+      })
+
+      onUpdate(block.id, { url: tokenData.publicUrl!, filename: tokenData.filename ?? file.name, width: 'full' })
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '업로드에 실패했습니다.')
     } finally {
       setUploading(false)
       setPendingName('')

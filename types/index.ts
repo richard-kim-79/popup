@@ -123,7 +123,8 @@ export interface VerifyPinResponse {
 }
 
 export interface UploadResponse {
-  url: string
+  signedUrl: string
+  publicUrl: string
   filename: string
 }
 

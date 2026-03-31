@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { verifyEditToken } from '@/lib/token'
-import type { UploadResponse, ApiError } from '@/types'
+import type { ApiError } from '@/types'
 
 type Params = { params: Promise<{ slug: string }> }
 
@@ -20,10 +20,23 @@ async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {
   }
 }
 
+interface SignedUploadRequest {
+  filename: string
+  mimeType: string
+  size: number
+}
+
+interface SignedUploadResponse {
+  signedUrl: string
+  publicUrl: string
+  filename: string
+}
+
+/** Signed URL 발급 — 파일은 클라이언트가 직접 Supabase에 PUT */
 export async function POST(
   req: NextRequest,
   { params }: Params
-): Promise<NextResponse<UploadResponse | ApiError>> {
+): Promise<NextResponse<SignedUploadResponse | ApiError>> {
   const { slug } = await params
   const editToken = req.headers.get('x-edit-token')
 
@@ -31,38 +44,42 @@ export async function POST(
     return NextResponse.json({ error: '편집 권한이 없습니다.' }, { status: 403 })
   }
 
-  const formData = await req.formData().catch(() => null)
-  const file = formData?.get('file') as File | null
-
-  if (!file) {
-    return NextResponse.json({ error: '파일을 첨부해주세요.' }, { status: 400 })
+  let body: SignedUploadRequest
+  try {
+    body = await req.json() as SignedUploadRequest
+  } catch {
+    return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 })
   }
 
-  if (!ALLOWED_MIME.includes(file.type)) {
+  const { filename, mimeType, size } = body
+
+  if (!ALLOWED_MIME.includes(mimeType)) {
     return NextResponse.json({ error: '지원하지 않는 파일 형식입니다.' }, { status: 400 })
   }
 
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: '파일 크기는 100MB 이하여야 합니다.' }, { status: 400 })
+  if (size > MAX_SIZE) {
+    return NextResponse.json({ error: '파일 크기는 500MB 이하여야 합니다.' }, { status: 400 })
   }
 
   const supabase = getSupabaseAdmin()
-
-  // 버킷이 없으면 자동 생성
   await ensureBucket(supabase)
 
-  const ext = file.name.split('.').pop() ?? 'bin'
+  const ext = filename.split('.').pop() ?? 'bin'
   const path = `${slug}/${Date.now()}.${ext}`
-  const buffer = await file.arrayBuffer()
 
-  const { error } = await supabase.storage
+  const { data, error } = await supabase.storage
     .from(BUCKET)
-    .upload(path, buffer, { contentType: file.type, upsert: false })
+    .createSignedUploadUrl(path)
 
-  if (error) {
-    return NextResponse.json({ error: `업로드 실패: ${error.message}` }, { status: 500 })
+  if (error || !data) {
+    return NextResponse.json({ error: `서명 URL 발급 실패: ${error?.message}` }, { status: 500 })
   }
 
   const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
-  return NextResponse.json({ url: publicUrl, filename: file.name }, { status: 201 })
+
+  return NextResponse.json({
+    signedUrl: data.signedUrl,
+    publicUrl,
+    filename,
+  }, { status: 200 })
 }
