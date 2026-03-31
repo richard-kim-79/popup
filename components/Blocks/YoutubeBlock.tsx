@@ -62,6 +62,7 @@ export default function YoutubeBlock({ block, onUpdate, onDelete }: Props) {
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               className="h-full w-full"
+              style={{ pointerEvents: showSize ? 'none' : 'auto' }}
             />
           </div>
           {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}

@@ -125,7 +125,6 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
           <a href="/" className="opacity-60 hover:opacity-100">
             <Logo size={16} />
           </a>
-          <span className="font-mono text-xs text-popup-muted">{slug}</span>
           {/* 저장 상태 도트 */}
           <span title={saveStatus === 'saving' ? '저장 중' : saveStatus === 'error' ? '저장 실패' : '저장됨'}
             className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />

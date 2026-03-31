@@ -114,7 +114,12 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
           onMouseLeave={() => setShowSize(false)}
         >
           <div className={`${widthClass} relative transition-all duration-200`}>
-            <video src={block.url} controls className="w-full rounded-lg" />
+            <video
+              src={block.url}
+              controls
+              className="w-full rounded-lg"
+              style={{ pointerEvents: showSize ? 'none' : 'auto' }}
+            />
             {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
           </div>
           <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
