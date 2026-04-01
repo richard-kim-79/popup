@@ -30,7 +30,7 @@ export default function UpgradeModal({ slug, onClose }: Props) {
     // @ts-expect-error — TossPayments는 CDN 스크립트로 로드됨
     if (typeof window.TossPayments !== 'undefined') {
       // @ts-expect-error
-      const toss = window.TossPayments(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY)
+      const toss = window.TossPayments((process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? '').trim())
       toss.requestPayment('카드', {
         amount: selectedPlan.amount,
         orderId,
