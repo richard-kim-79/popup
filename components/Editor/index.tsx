@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { nanoid } from 'nanoid'
+import type { ImageBlock as ImageBlockType } from '@/types'
 import Logo from '@/components/UI/Logo'
 import BlockList from './BlockList'
 import BlockAdder from './BlockAdder'
@@ -27,8 +28,9 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const [showBanner, setShowBanner] = useState(daysLeft <= 7 && !locked)
   const [showShare, setShowShare] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const blocksRef   = useRef<Block[]>(initialBlocks)   // 최신 blocks를 ref로 추적
+  const debounceRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const blocksRef      = useRef<Block[]>(initialBlocks)
+  const pendingFilesRef = useRef<Map<string, File>>(new Map())
 
   const save = useCallback(async (newBlocks: Block[]) => {
     setSaveStatus('saving')
@@ -75,6 +77,27 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       return next
     })
     setTimeout(() => setSelectedId(nb.id), 0)
+  }, [save])
+
+  const handleReorder = useCallback((newBlocks: Block[]) => {
+    setBlocks(newBlocks)
+    blocksRef.current = newBlocks
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => save(newBlocks), 300)
+  }, [save])
+
+  const handleAddImages = useCallback((afterId: string, files: File[]) => {
+    const newBlocks: Block[] = files.map(() => ({ id: nanoid(6), type: 'image' } as ImageBlockType))
+    files.forEach((file, i) => pendingFilesRef.current.set(newBlocks[i].id, file))
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === afterId)
+      const next = [...prev]
+      next.splice(idx + 1, 0, ...newBlocks)
+      blocksRef.current = next
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => save(next), 300)
+      return next
+    })
   }, [save])
 
   const handleAdd = useCallback((type: BlockType) => {
@@ -169,6 +192,9 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
           onUpdate={handleUpdate}
           onDelete={handleDelete}
           onAddBelow={handleAddBelow}
+          onReorder={handleReorder}
+          onAddFilesBelow={handleAddImages}
+          pendingFiles={pendingFilesRef.current}
         />
 
         {!locked && <BlockAdder onAdd={handleAdd} />}

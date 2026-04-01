@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import type { ImageBlock as ImageBlockType, ImageWidth } from '@/types'
 import SizeOverlay, { getWidthClass } from './SizeOverlay'
 
@@ -10,6 +10,8 @@ interface Props {
   editToken: string
   onUpdate: (id: string, patch: Partial<ImageBlockType>) => void
   onDelete: (id: string) => void
+  onAddFilesBelow?: (files: File[]) => void
+  initialFile?: File
 }
 
 /** URL에서 파일명 추출 — 한글/영문/특수문자 모두 처리 */
@@ -24,25 +26,27 @@ function getFilename(url: string, fallback?: string): string {
 
 function isPDF(url: string) { return url.toLowerCase().endsWith('.pdf') }
 
-export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete }: Props) {
+export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete, onAddFilesBelow, initialFile }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading]     = useState(false)
   const [progress, setProgress]       = useState(0)
   const [pendingName, setPendingName] = useState('')
   const [showSize, setShowSize]       = useState(false)
+  const uploadingRef = useRef(false)
 
   const handleSizeChange = useCallback((w: ImageWidth) => {
     onUpdate(block.id, { width: w })
     setShowSize(false)
   }, [block.id, onUpdate])
 
-  const handleFile = async (file: File) => {
+  const uploadFile = useCallback(async (file: File) => {
+    if (uploadingRef.current) return
+    uploadingRef.current = true
     setPendingName(file.name)
     setUploading(true)
     setProgress(0)
 
     try {
-      // 1단계: 서버에서 Signed URL 발급 (editToken 검증 + MIME 확인)
       const tokenRes = await fetch(`/api/pages/${slug}/upload`, {
         method: 'POST',
         headers: {
@@ -57,7 +61,6 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
         return
       }
 
-      // 2단계: 클라이언트 → Supabase 직접 PUT (실제 진행률)
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
         xhr.open('PUT', tokenData.signedUrl!)
@@ -80,8 +83,27 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       setUploading(false)
       setPendingName('')
       setProgress(0)
+      uploadingRef.current = false
     }
-  }
+  }, [block.id, slug, editToken, onUpdate])
+
+  // 초기 파일이 있으면 자동 업로드 시작
+  useEffect(() => {
+    if (initialFile && !block.url && !uploadingRef.current) {
+      uploadFile(initialFile)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    const arr = Array.from(files)
+    if (arr.length === 0) return
+    const [first, ...rest] = arr
+    uploadFile(first)
+    if (rest.length > 0 && onAddFilesBelow) {
+      onAddFilesBelow(rest)
+    }
+  }, [uploadFile, onAddFilesBelow])
 
   /* ── 업로드 완료 상태 ── */
   if (block.url) {
@@ -110,11 +132,9 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
             <a href={block.url} target="_blank" rel="noreferrer"
               className="flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
               {pdfIcon}
-              {/* 중·대: 파일명 표시 */}
               {w !== 'small' && (
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
-                  {/* 대: 설명 표시 */}
                   {w === 'full' && (
                     <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
                   )}
@@ -175,12 +195,16 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
       className="group relative cursor-pointer rounded-lg border-2 border-dashed border-popup-border bg-popup-bg px-6 py-9 text-center transition-colors hover:border-popup-accent"
       onClick={() => !uploading && inputRef.current?.click()}
       onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && !uploading) handleFile(f) }}
+      onDrop={(e) => { e.preventDefault(); if (!uploading) handleFiles(e.dataTransfer.files) }}
     >
-      <input ref={inputRef} type="file"
+      <input
+        ref={inputRef}
+        type="file"
         accept="image/*,application/pdf"
+        multiple
         className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+        onChange={(e) => { if (e.target.files && e.target.files.length > 0) handleFiles(e.target.files) }}
+      />
 
       {uploading ? (
         <>
@@ -200,7 +224,7 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete 
             <path d="M3 16l4.5-4 3.5 3 3-2 7 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <p className="text-sm text-popup-muted">이미지 / 문서 업로드</p>
-          <p className="mt-1 text-xs text-popup-faint">클릭하거나 파일을 드래그하세요</p>
+          <p className="mt-1 text-xs text-popup-faint">클릭하거나 여러 파일을 한 번에 드래그하세요</p>
         </>
       )}
 
