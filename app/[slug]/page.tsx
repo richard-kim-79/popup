@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import Logo from '@/components/UI/Logo'
 import ReportButton from '@/components/ReportButton'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
@@ -31,6 +32,57 @@ const REPORT_HIDE_THRESHOLD = 3
 
 interface Props {
   params: Promise<{ slug: string }>
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params
+  const supabase = getSupabaseAdmin()
+  const BASE = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://leaf-bluewhale2025.vercel.app'
+
+  const { data } = await supabase
+    .from('pages')
+    .select('blocks')
+    .eq('slug', slug)
+    .is('deleted_at', null)
+    .single()
+
+  const blocks = ((data?.blocks ?? []) as unknown) as Block[]
+
+  // 첫 번째 H1을 제목으로
+  const titleBlock = blocks.find((b) => b.type === 'h1' && (b as { content?: string }).content?.trim())
+  const rawTitle = titleBlock ? (titleBlock as { content: string }).content.trim() : null
+  const title = rawTitle ?? 'Popup 페이지'
+
+  // 첫 번째 text 블록을 설명으로
+  const textBlock = blocks.find((b) => b.type === 'text' && (b as { content?: string }).content?.trim())
+  const description = textBlock
+    ? (textBlock as { content: string }).content.trim().slice(0, 120)
+    : '30초 만에 웹페이지를 만들고 링크로 공유하세요'
+
+  // 첫 번째 이미지를 OG 이미지로
+  const imageBlock = blocks.find((b) => b.type === 'image' && (b as { url?: string }).url)
+  const ogImage = imageBlock ? (imageBlock as { url: string }).url : undefined
+
+  const pageUrl = `${BASE}/${slug}`
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: pageUrl,
+      siteName: 'Popup',
+      type: 'website',
+      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
+    },
+    twitter: {
+      card: ogImage ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
+  }
 }
 
 function renderBlock(block: Block) {
