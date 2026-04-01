@@ -13,25 +13,26 @@ interface Props {
 }
 
 const STYLES: Record<string, { fontSize: string; fontWeight: string; lineHeight: string; placeholder: string }> = {
-  h1:   { fontSize: 'text-4xl', fontWeight: 'font-extrabold', lineHeight: 'leading-snug', placeholder: '제목' },
-  h2:   { fontSize: 'text-2xl', fontWeight: 'font-bold',      lineHeight: 'leading-snug', placeholder: '소제목' },
+  h1:   { fontSize: 'text-4xl', fontWeight: 'font-extrabold', lineHeight: 'leading-snug',    placeholder: '제목' },
+  h2:   { fontSize: 'text-2xl', fontWeight: 'font-bold',      lineHeight: 'leading-snug',    placeholder: '소제목' },
   text: { fontSize: 'text-base', fontWeight: 'font-normal',   lineHeight: 'leading-relaxed', placeholder: '내용을 입력하세요...' },
 }
 
 export default function TextBlock({ block, selected, onUpdate, onDelete, onAddBelow, onSelect }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const style = STYLES[block.type]
+  const isText = block.type === 'text'
 
-  // 초기 마운트 시 한 번만 content 설정 — React가 children을 관리하지 않도록
+  // 초기 마운트 시 한 번만 content 설정
   useEffect(() => {
-    if (ref.current) ref.current.textContent = block.content ?? ''
+    if (ref.current) ref.current.innerText = block.content ?? ''
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 외부(로드/복원)에서 content가 바뀔 때만 DOM 동기화 (타이핑 중엔 스킵)
+  // 외부(로드/복원)에서 content가 바뀔 때만 DOM 동기화
   useEffect(() => {
     if (ref.current && document.activeElement !== ref.current) {
-      ref.current.textContent = block.content ?? ''
+      ref.current.innerText = block.content ?? ''
     }
   }, [block.content])
 
@@ -54,12 +55,29 @@ export default function TextBlock({ block, selected, onUpdate, onDelete, onAddBe
         contentEditable
         suppressContentEditableWarning
         data-ph={style.placeholder}
-        className={`min-h-[1.2em] flex-1 py-0.5 text-popup-text ${style.fontSize} ${style.fontWeight} ${style.lineHeight}`}
-        onInput={(e) => onUpdate(block.id, (e.target as HTMLDivElement).textContent ?? '')}
+        className={`min-h-[1.2em] flex-1 py-0.5 text-popup-text ${style.fontSize} ${style.fontWeight} ${style.lineHeight}${isText ? ' whitespace-pre-wrap' : ''}`}
+        onInput={(e) => {
+          const el = e.target as HTMLDivElement
+          // innerText preserves \n from <br> and <div> elements
+          const text = el.innerText.replace(/\n$/, '')
+          onUpdate(block.id, text)
+        }}
         onFocus={() => onSelect(block.id)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onAddBelow(block.id) }
-          if (e.key === 'Backspace' && !ref.current?.textContent?.trim()) { e.preventDefault(); onDelete(block.id) }
+          if (e.key === 'Enter') {
+            if (isText) {
+              // text 블록: Enter → 줄바꿈 (브라우저 기본 동작 허용)
+              // Shift+Enter도 동일하게 허용
+            } else {
+              // h1/h2: Enter → 새 블록 추가
+              e.preventDefault()
+              if (!e.shiftKey) onAddBelow(block.id)
+            }
+          }
+          if (e.key === 'Backspace' && !ref.current?.textContent?.trim()) {
+            e.preventDefault()
+            onDelete(block.id)
+          }
         }}
       />
       <button
