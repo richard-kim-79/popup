@@ -14,7 +14,8 @@ function SuccessInner() {
     const paymentKey = searchParams.get('paymentKey')
     const orderId    = searchParams.get('orderId')
     const amount     = searchParams.get('amount')
-    const slug       = searchParams.get('slug')
+    // slug는 query param 우선, 없으면 orderId에서 추출 (형식: {slug}_{plan}_{ts})
+    const slug = searchParams.get('slug') ?? orderId?.split('_')[0] ?? null
 
     if (!paymentKey || !orderId || !amount) {
       setStatus('error')
@@ -24,10 +25,11 @@ function SuccessInner() {
 
     fetch(`/api/payments/confirm?paymentKey=${paymentKey}&orderId=${orderId}&amount=${amount}`)
       .then((r) => r.json())
-      .then((data) => {
+      .then((data: { ok?: boolean; slug?: string; error?: string }) => {
         if (data.ok) {
           setStatus('ok')
-          setTimeout(() => router.push(slug ? `/${slug}/edit` : '/'), 2000)
+          const target = data.slug ?? slug
+          setTimeout(() => router.push(target ? `/${target}/edit` : '/'), 2000)
         } else {
           setStatus('error')
           setMessage(data.error ?? '결제 처리에 실패했습니다.')

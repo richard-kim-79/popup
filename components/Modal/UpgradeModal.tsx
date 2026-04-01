@@ -40,7 +40,7 @@ export default function UpgradeModal({ slug, onClose }: Props) {
         failUrl: `${baseUrl}/payment/fail?slug=${slug}`,
       })
     } else {
-      setStep('done')
+      alert('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
     }
   }
 
@@ -109,7 +109,7 @@ export default function UpgradeModal({ slug, onClose }: Props) {
             placeholder="이메일 주소"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') setStep('pay') }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && email.trim()) setStep('pay') }}
             className="mb-2.5 w-full rounded-lg border border-popup-border bg-popup-surface px-3 py-2.5 text-sm text-popup-text outline-none transition-colors focus:border-popup-accent"
           />
           <button
