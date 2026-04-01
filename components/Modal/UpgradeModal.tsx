@@ -24,7 +24,7 @@ export default function UpgradeModal({ slug, onClose }: Props) {
   const selectedPlan = PLANS.find((p) => p.id === plan)!
 
   const handlePay = () => {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? ''
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? '').trim()
     const orderId = `${slug}_${plan}_${Date.now()}`
 
     // @ts-expect-error — TossPayments는 CDN 스크립트로 로드됨

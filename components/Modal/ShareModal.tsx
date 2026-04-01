@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function ShareModal({ slug, onClose }: Props) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? ''
+  const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? '').trim()
   const url = `${baseUrl}/${slug}`
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)

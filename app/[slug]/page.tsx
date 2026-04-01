@@ -37,7 +37,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const supabase = getSupabaseAdmin()
-  const BASE = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://leaf-bluewhale2025.vercel.app'
+  const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://leaf-bluewhale2025.vercel.app').trim()
 
   const { data } = await supabase
     .from('pages')
