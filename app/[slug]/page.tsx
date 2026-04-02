@@ -7,6 +7,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { daysLeft } from '@/lib/slug'
 import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
 import SocialEmbed from '@/components/Blocks/SocialEmbed'
+import ExpiryUpgradeButton from '@/components/Viewer/ExpiryUpgradeButton'
 
 /** URL에서 hostname 안전하게 추출 */
 function safeHostname(url: string): string {
@@ -282,7 +283,7 @@ export default async function ViewerPage({ params }: Props) {
         <div className="flex items-center justify-center gap-3">
           <Link href={`/${slug}/edit`} className="text-xs text-popup-faint hover:text-popup-muted">편집</Link>
           <span className="text-popup-faint">·</span>
-          <span className="text-xs text-popup-faint">{remaining > 0 ? `${remaining}일 후 소멸` : '소멸됨'}</span>
+          <ExpiryUpgradeButton slug={slug} remaining={remaining} />
           <span className="text-popup-faint">·</span>
           <ReportButton slug={slug} />
         </div>
