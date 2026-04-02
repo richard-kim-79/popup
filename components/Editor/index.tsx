@@ -270,14 +270,9 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
 
         {!locked && <BlockAdder onAdd={handleAdd} />}
 
-        {/* 페이지 링크 푸터 */}
-        <div className="mt-16 flex items-center justify-between">
-          <span className="font-mono text-xs text-popup-faint">
-            {(process.env.NEXT_PUBLIC_BASE_URL ?? 'popup.page').trim()}/{slug}
-          </span>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-popup-faint">{daysLeft}일 남음</span>
-          </div>
+        {/* 페이지 하단 여백 */}
+        <div className="mt-16 flex justify-end">
+          <span className="text-xs text-popup-faint">{daysLeft}일 남음</span>
         </div>
       </div>
 
