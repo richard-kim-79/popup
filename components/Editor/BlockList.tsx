@@ -1,13 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   PointerSensor,
   TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
   type DraggableSyntheticListeners,
   type DraggableAttributes,
 } from '@dnd-kit/core'
@@ -40,6 +43,43 @@ interface Props {
   pendingFiles: Map<string, File>
 }
 
+/* ── 블록 타입 라벨 ────────────────────────────────── */
+const BLOCK_LABELS: Record<string, string> = {
+  h1: '제목', h2: '소제목', text: '텍스트', image: '이미지',
+  button: '버튼', divider: '구분선', youtube: '유튜브', link: '링크',
+}
+
+/* ── 드래그 중 플로팅 카드 (DragOverlay) ───────────── */
+function BlockDragCard({ block }: { block: Block }) {
+  const label = BLOCK_LABELS[block.type] ?? block.type
+  const preview = (() => {
+    if (block.type === 'h1' && 'content' in block) return block.content || '제목'
+    if (block.type === 'h2' && 'content' in block) return block.content || '소제목'
+    if (block.type === 'text' && 'content' in block) return block.content || '텍스트'
+    if (block.type === 'button' && 'label' in block) return (block as ButtonBlock).label || '버튼'
+    return label
+  })()
+
+  return (
+    <div className="flex cursor-grabbing items-center gap-3 rounded-xl border border-popup-accent bg-popup-white px-4 py-3 shadow-2xl ring-2 ring-popup-accent/20">
+      {/* 핸들 아이콘 */}
+      <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" className="shrink-0 text-popup-accent">
+        <circle cx="3.5" cy="2.5" r="1.5" />
+        <circle cx="8.5" cy="2.5" r="1.5" />
+        <circle cx="3.5" cy="8" r="1.5" />
+        <circle cx="8.5" cy="8" r="1.5" />
+        <circle cx="3.5" cy="13.5" r="1.5" />
+        <circle cx="8.5" cy="13.5" r="1.5" />
+      </svg>
+      <div className="min-w-0">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-popup-accent">{label}</p>
+        <p className="truncate text-sm text-popup-text">{String(preview).slice(0, 40) || label}</p>
+      </div>
+    </div>
+  )
+}
+
+/* ── 드래그 핸들 버튼 ──────────────────────────────── */
 function DragHandle({ listeners, attributes }: {
   listeners: DraggableSyntheticListeners
   attributes: DraggableAttributes
@@ -49,9 +89,9 @@ function DragHandle({ listeners, attributes }: {
       type="button"
       {...listeners}
       {...attributes}
-      aria-label="블록 이동"
+      aria-label="길게 눌러서 블록 이동"
       tabIndex={-1}
-      className="mt-1 flex h-8 w-5 shrink-0 touch-none cursor-grab items-center justify-center rounded text-popup-faint opacity-60 transition-opacity active:cursor-grabbing sm:opacity-0 sm:group-hover:opacity-60"
+      className="drag-handle-btn mt-0.5 flex h-10 w-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg text-popup-faint transition-colors duration-200 active:cursor-grabbing sm:h-8 sm:w-5 sm:opacity-0 sm:group-hover:opacity-60"
     >
       <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
         <circle cx="3.5" cy="2.5" r="1.5" />
@@ -65,6 +105,7 @@ function DragHandle({ listeners, attributes }: {
   )
 }
 
+/* ── 정렬 가능 블록 래퍼 ────────────────────────────── */
 function SortableBlock({
   block, slug, editToken, selectedId, onSelect, onUpdate, onDelete, onAddBelow, onAddFilesBelow, initialFile,
 }: {
@@ -83,10 +124,7 @@ function SortableBlock({
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.35 : 1,
-    zIndex: isDragging ? 50 : undefined,
-    position: 'relative',
+    transition: transition ?? 'transform 200ms ease',
   }
 
   const isSelected = selectedId === block.id
@@ -166,20 +204,33 @@ function SortableBlock({
   return (
     <div ref={setNodeRef} style={style} className="group flex items-start gap-1.5">
       <DragHandle listeners={listeners} attributes={attributes} />
-      <div className="min-w-0 flex-1">{content}</div>
+      {/* 드래그 중: 점선 ghost placeholder */}
+      {isDragging ? (
+        <div className="min-h-[40px] flex-1 rounded-lg border-2 border-dashed border-popup-accent/40 bg-popup-accent-bg/30" />
+      ) : (
+        <div className="min-w-0 flex-1">{content}</div>
+      )}
     </div>
   )
 }
 
+/* ── BlockList ─────────────────────────────────────── */
 export default function BlockList({
   blocks, slug, editToken, selectedId, onSelect, onUpdate, onDelete, onAddBelow, onReorder, onAddFilesBelow, pendingFiles,
 }: Props) {
+  const [activeId, setActiveId] = useState<string | null>(null)
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
   )
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
     const oldIdx = blocks.findIndex(b => b.id === active.id)
@@ -187,8 +238,16 @@ export default function BlockList({
     onReorder(arrayMove(blocks, oldIdx, newIdx))
   }
 
+  const activeBlock = activeId ? blocks.find(b => b.id === activeId) : null
+
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveId(null)}
+    >
       <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col gap-1.5">
           {blocks.map((block) => (
@@ -208,6 +267,11 @@ export default function BlockList({
           ))}
         </div>
       </SortableContext>
+
+      {/* 드래그 중 플로팅 카드 */}
+      <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
+        {activeBlock ? <BlockDragCard block={activeBlock} /> : null}
+      </DragOverlay>
     </DndContext>
   )
 }
