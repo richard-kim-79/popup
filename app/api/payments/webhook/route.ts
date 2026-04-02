@@ -1,37 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 
 // 토스페이먼츠 웹훅: 결제 상태 동기화
-// 서명 검증: https://docs.tosspayments.com/guides/webhook
+// 토스페이먼츠는 웹훅 시크릿을 제공하지 않으므로 orderId 기반으로 유효성 확인
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // 웹훅 시크릿 미설정 시 즉시 거부
-  if (!process.env.TOSS_WEBHOOK_SECRET) {
-    return NextResponse.json({ error: '웹훅 설정 오류' }, { status: 500 })
+  let body: { eventType?: string; data?: { orderId?: string; status?: string } }
+  try {
+    body = await req.json() as typeof body
+  } catch {
+    return NextResponse.json({ error: '잘못된 요청입니다.' }, { status: 400 })
   }
 
-  const rawBody = await req.text()
-  const signature = req.headers.get('toss-payments-signature') ?? ''
+  const { eventType, data } = body
 
-  // HMAC-SHA256 서명 검증
-  const expected = crypto
-    .createHmac('sha256', process.env.TOSS_WEBHOOK_SECRET)
-    .update(rawBody)
-    .digest('base64')
-
-  if (signature !== expected) {
-    return NextResponse.json({ error: '서명 불일치' }, { status: 401 })
-  }
-
-  const event = JSON.parse(rawBody) as {
-    eventType: string
-    data: { orderId: string; status: string }
-  }
-  const { eventType, data } = event
-
-  if (eventType === 'PAYMENT_STATUS_CHANGED') {
+  if (eventType === 'PAYMENT_STATUS_CHANGED' && data?.orderId && data?.status) {
     const { orderId, status } = data
     const supabase = getSupabaseAdmin()
+
+    // orderId가 DB에 존재하는지 확인 (유효성 검증)
+    const { data: payment } = await supabase
+      .from('payments')
+      .select('order_id')
+      .eq('order_id', orderId)
+      .maybeSingle()
+
+    if (!payment) {
+      return NextResponse.json({ ok: true }) // 알 수 없는 주문 — 무시
+    }
 
     const mapped = status === 'DONE'     ? 'done'
       : status === 'CANCELED' ? 'canceled'
