@@ -28,29 +28,99 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const [showBanner, setShowBanner] = useState(daysLeft <= 7 && !locked)
   const [showShare, setShowShare] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
-  const debounceRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const blocksRef      = useRef<Block[]>(initialBlocks)
-  const pendingFilesRef = useRef<Map<string, File>>(new Map())
 
+  const debounceRef      = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const blocksRef        = useRef<Block[]>(initialBlocks)
+  const pendingFilesRef  = useRef<Map<string, File>>(new Map())
+  const savingRef        = useRef(false)           // 현재 저장 요청 진행 중 여부
+  const pendingBlocksRef = useRef<Block[] | null>(null)  // 저장 중 들어온 최신 blocks
+
+  // ── 핵심 저장 함수 ──────────────────────────────────────────────────
   const save = useCallback(async (newBlocks: Block[]) => {
+    // 이미 저장 중이면 pending에 최신 상태 기록 후 리턴
+    if (savingRef.current) {
+      pendingBlocksRef.current = newBlocks
+      return
+    }
+
+    savingRef.current = true
     setSaveStatus('saving')
-    const res = await fetch(`/api/pages/${slug}/blocks`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ editToken, blocks: newBlocks }),
-    })
-    setSaveStatus(res.ok ? 'saved' : 'error')
+
+    try {
+      const res = await fetch(`/api/pages/${slug}/blocks`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editToken, blocks: newBlocks }),
+      })
+      setSaveStatus(res.ok ? 'saved' : 'error')
+    } catch {
+      // 네트워크 오류
+      setSaveStatus('error')
+    } finally {
+      savingRef.current = false
+      // 저장 중 들어온 pending이 있으면 즉시 재저장
+      if (pendingBlocksRef.current) {
+        const pending = pendingBlocksRef.current
+        pendingBlocksRef.current = null
+        save(pending)
+      }
+    }
   }, [slug, editToken])
 
+  // ── debounce 헬퍼 ───────────────────────────────────────────────────
+  const scheduleSave = useCallback((newBlocks: Block[]) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null
+      save(newBlocks)
+    }, 800)
+  }, [save])
+
+  // ── 즉시 flush (탭 닫기·숨김 시) ────────────────────────────────────
+  const flushNow = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+      fetch(`/api/pages/${slug}/blocks`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editToken, blocks: blocksRef.current }),
+        keepalive: true,
+      }).catch(() => {})
+    }
+  }, [slug, editToken])
+
+  // ── 탭 숨김·닫기 이벤트 ─────────────────────────────────────────────
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') flushNow()
+    }
+    const handleBeforeUnload = () => flushNow()
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('pagehide', handleBeforeUnload)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('pagehide', handleBeforeUnload)
+      flushNow()   // 컴포넌트 언마운트 시 flush
+    }
+  }, [flushNow])
+
+  // ── 수동 재시도 ──────────────────────────────────────────────────────
+  const handleRetry = useCallback(() => {
+    save(blocksRef.current)
+  }, [save])
+
+  // ── 블록 CRUD ────────────────────────────────────────────────────────
   const handleUpdate = useCallback((id: string, patch: Partial<Block>) => {
     setBlocks((prev) => {
       const next = prev.map((b) => b.id === id ? { ...b, ...patch } : b) as Block[]
       blocksRef.current = next
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => save(next), 300)
+      scheduleSave(next)
       return next
     })
-  }, [save])
+  }, [scheduleSave])
 
   const handleDelete = useCallback((id: string) => {
     setBlocks((prev) => {
@@ -59,11 +129,10 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       const next = prev.filter((b) => b.id !== id)
       blocksRef.current = next
       setSelectedId(next[Math.max(0, idx - 1)]?.id ?? null)
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => save(next), 300)
+      scheduleSave(next)
       return next
     })
-  }, [save])
+  }, [scheduleSave])
 
   const handleAddBelow = useCallback((id: string) => {
     const nb: Block = { id: nanoid(6), type: 'text', content: '' }
@@ -72,19 +141,17 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       const next = [...prev]
       next.splice(idx + 1, 0, nb)
       blocksRef.current = next
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => save(next), 300)
+      scheduleSave(next)
       return next
     })
     setTimeout(() => setSelectedId(nb.id), 0)
-  }, [save])
+  }, [scheduleSave])
 
   const handleReorder = useCallback((newBlocks: Block[]) => {
     setBlocks(newBlocks)
     blocksRef.current = newBlocks
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => save(newBlocks), 300)
-  }, [save])
+    scheduleSave(newBlocks)
+  }, [scheduleSave])
 
   const handleAddImages = useCallback((afterId: string, files: File[]) => {
     const newBlocks: Block[] = files.map(() => ({ id: nanoid(6), type: 'image' } as ImageBlockType))
@@ -94,11 +161,10 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       const next = [...prev]
       next.splice(idx + 1, 0, ...newBlocks)
       blocksRef.current = next
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => save(next), 300)
+      scheduleSave(next)
       return next
     })
-  }, [save])
+  }, [scheduleSave])
 
   const handleAdd = useCallback((type: BlockType) => {
     const defaults: Record<BlockType, Partial<Block>> = {
@@ -110,50 +176,49 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
     setBlocks((prev) => {
       const next = [...prev, nb]
       blocksRef.current = next
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => save(next), 300)
+      scheduleSave(next)
       return next
     })
     setTimeout(() => setSelectedId(nb.id), 0)
-  }, [save])
+  }, [scheduleSave])
 
-  // 언마운트 시: pending debounce가 있으면 즉시 flush (keepalive로 안전하게 전송)
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-        fetch(`/api/pages/${slug}/blocks`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ editToken, blocks: blocksRef.current }),
-          keepalive: true,
-        }).catch(() => {})
-      }
+  // ── 저장 상태 UI ─────────────────────────────────────────────────────
+  const SaveIndicator = () => {
+    if (saveStatus === 'saving') {
+      return (
+        <span className="flex items-center gap-1 text-[11px] text-popup-muted">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+          저장 중
+        </span>
+      )
     }
-  }, [slug, editToken])
-
-  // 저장 상태 도트 색상
-  const dotColor =
-    saveStatus === 'saving' ? 'bg-amber-400 animate-pulse' :
-    saveStatus === 'error'  ? 'bg-red-400' :
-    'bg-popup-accent/50'
+    if (saveStatus === 'error') {
+      return (
+        <button
+          onClick={handleRetry}
+          className="flex items-center gap-1 text-[11px] text-red-500 hover:underline"
+          title="클릭하여 재시도"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+          저장 실패 — 재시도
+        </button>
+      )
+    }
+    return <span className="h-1.5 w-1.5 rounded-full bg-popup-accent/50" title="저장됨" />
+  }
 
   return (
     <div className="min-h-screen bg-popup-bg">
 
-      {/* ── 상단바: 미니멀 ── */}
+      {/* ── 상단바 ── */}
       <div className="sticky top-0 z-[200] flex h-11 items-center justify-between border-b border-popup-border bg-popup-bg/95 px-4 backdrop-blur-sm">
-        {/* 왼쪽: 로고 + slug */}
         <div className="flex items-center gap-2.5">
           <a href="/" className="opacity-60 hover:opacity-100">
             <Logo size={16} />
           </a>
-          {/* 저장 상태 도트 */}
-          <span title={saveStatus === 'saving' ? '저장 중' : saveStatus === 'error' ? '저장 실패' : '저장됨'}
-            className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+          <SaveIndicator />
         </div>
 
-        {/* 오른쪽: 공유 버튼 하나만 */}
         <div className="flex items-center gap-2">
           {locked && (
             <button
@@ -202,7 +267,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
         {/* 페이지 링크 푸터 */}
         <div className="mt-16 flex items-center justify-between">
           <span className="font-mono text-xs text-popup-faint">
-            {process.env.NEXT_PUBLIC_BASE_URL ?? 'popup.page'}/{slug}
+            {(process.env.NEXT_PUBLIC_BASE_URL ?? 'popup.page').trim()}/{slug}
           </span>
           <div className="flex items-center gap-3">
             <span className="text-xs text-popup-faint">{daysLeft}일 남음</span>
