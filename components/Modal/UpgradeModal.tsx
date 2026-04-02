@@ -12,8 +12,8 @@ interface Props {
 type Step = 'plan' | 'auth' | 'pay' | 'done'
 
 const PLANS: { id: Plan; label: string; price: string; amount: number; sub: string; badge?: string }[] = [
-  { id: 'month', label: '1개월', price: '1,000원', amount: 1000, sub: '잠금 해제 · 계속 편집' },
-  { id: 'year',  label: '1년',   price: '10,000원', amount: 10000, sub: '월 833원 · 2개월 무료', badge: '추천' },
+  { id: 'month', label: '1개월 연장', price: '1,000원', amount: 1000, sub: '잠금 해제 · 계속 편집' },
+  { id: 'year',  label: '1년 연장',   price: '10,000원', amount: 10000, sub: '월 833원 · 2개월 무료', badge: '추천' },
 ]
 
 export default function UpgradeModal({ slug, onClose }: Props) {
