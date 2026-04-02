@@ -285,8 +285,6 @@ export default async function ViewerPage({ params }: Props) {
           <span className="text-xs text-popup-faint">{remaining > 0 ? `${remaining}일 후 소멸` : '소멸됨'}</span>
           <span className="text-popup-faint">·</span>
           <ReportButton slug={slug} />
-          <span className="text-popup-faint">·</span>
-          <Link href="/" className="text-xs text-popup-faint hover:text-popup-muted">Popup으로 만들기</Link>
         </div>
       </div>
     </div>
