@@ -252,14 +252,9 @@ export default async function ViewerPage({ params }: Props) {
           <Logo size={18} />
           <span className="text-sm font-bold text-popup-text">Popup</span>
         </Link>
-        <div className="flex items-center gap-3">
-          {data.locked && (
-            <span className="rounded bg-popup-warn-bg px-2 py-0.5 text-xs text-popup-warn">🔒 잠금됨</span>
-          )}
-          <Link href={`/${slug}/edit`} className="text-xs text-popup-muted hover:text-popup-text">
-            편집
-          </Link>
-        </div>
+        {data.locked && (
+          <span className="rounded bg-popup-warn-bg px-2 py-0.5 text-xs text-popup-warn">🔒 잠금됨</span>
+        )}
       </nav>
 
       {/* Locked banner */}
@@ -285,6 +280,8 @@ export default async function ViewerPage({ params }: Props) {
       {/* Footer */}
       <div className="border-t border-popup-border px-6 py-4 text-center">
         <div className="flex items-center justify-center gap-3">
+          <Link href={`/${slug}/edit`} className="text-xs text-popup-faint hover:text-popup-muted">편집</Link>
+          <span className="text-popup-faint">·</span>
           <span className="text-xs text-popup-faint">{remaining > 0 ? `${remaining}일 후 소멸` : '소멸됨'}</span>
           <span className="text-popup-faint">·</span>
           <ReportButton slug={slug} />
