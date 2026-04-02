@@ -23,24 +23,35 @@ export default function UpgradeModal({ slug, onClose }: Props) {
 
   const selectedPlan = PLANS.find((p) => p.id === plan)!
 
-  const handlePay = () => {
+  const handlePay = async () => {
     const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? '').trim()
     const orderId = `${slug}_${plan}_${Date.now()}`
 
-    // @ts-expect-error — TossPayments는 CDN 스크립트로 로드됨
-    if (typeof window.TossPayments !== 'undefined') {
+    // @ts-expect-error — TossPayments v2 loaded via CDN
+    if (typeof window.TossPayments === 'undefined') {
+      alert('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
+
+    try {
       // @ts-expect-error
-      const toss = window.TossPayments((process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? '').trim())
-      toss.requestPayment('카드', {
-        amount: selectedPlan.amount,
+      const tossPayments = await window.TossPayments((process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? '').trim())
+      const payment = tossPayments.payment({ customerKey: '__anonymous__' })
+
+      await payment.request({
+        method: '카드',
+        amount: { currency: 'KRW', value: selectedPlan.amount },
         orderId,
         orderName: `Popup ${selectedPlan.label} 이용권`,
         customerEmail: email || undefined,
         successUrl: `${baseUrl}/payment/success?slug=${slug}&email=${encodeURIComponent(email)}`,
         failUrl: `${baseUrl}/payment/fail?slug=${slug}`,
       })
-    } else {
-      alert('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+    } catch (err) {
+      const error = err as { code?: string; message?: string }
+      // 사용자가 직접 닫은 경우는 무시
+      if (error.code === 'USER_CANCEL' || error.code === 'PAY_PROCESS_CANCELED') return
+      alert(error.message ?? '결제 중 오류가 발생했습니다. 다시 시도해주세요.')
     }
   }
 
