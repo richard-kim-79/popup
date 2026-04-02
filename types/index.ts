@@ -232,6 +232,7 @@ export type Database = {
           status: string
           extended_until: string | null
           paid_at: string | null
+          customer_email: string | null
           created_at: string
         }
         Insert: {
@@ -245,6 +246,7 @@ export type Database = {
           status?: string
           extended_until?: string | null
           paid_at?: string | null
+          customer_email?: string | null
           created_at?: string
         }
         Update: {
@@ -258,9 +260,38 @@ export type Database = {
           status?: string
           extended_until?: string | null
           paid_at?: string | null
+          customer_email?: string | null
           created_at?: string
         }
         Relationships: []
+      }
+      page_emails: {
+        Row: {
+          id: string
+          page_id: string
+          email: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          page_id: string
+          email: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          page_id?: string
+          email?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'page_emails_page_id_fkey'
+            columns: ['page_id']
+            referencedRelation: 'pages'
+            referencedColumns: ['id']
+          }
+        ]
       }
     }
     Views: Record<string, never>

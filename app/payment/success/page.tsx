@@ -16,6 +16,7 @@ function SuccessInner() {
     const amount     = searchParams.get('amount')
     // slug는 query param 우선, 없으면 orderId에서 추출 (형식: {slug}_{plan}_{ts})
     const slug = searchParams.get('slug') ?? orderId?.split('_')[0] ?? null
+    const email = searchParams.get('email') ?? ''
 
     if (!paymentKey || !orderId || !amount) {
       setStatus('error')
@@ -23,7 +24,7 @@ function SuccessInner() {
       return
     }
 
-    fetch(`/api/payments/confirm?paymentKey=${paymentKey}&orderId=${orderId}&amount=${amount}`)
+    fetch(`/api/payments/confirm?paymentKey=${paymentKey}&orderId=${orderId}&amount=${amount}&email=${encodeURIComponent(email)}`)
       .then((r) => r.json())
       .then((data: { ok?: boolean; slug?: string; error?: string }) => {
         if (data.ok) {

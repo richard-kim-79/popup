@@ -36,7 +36,7 @@ export default function UpgradeModal({ slug, onClose }: Props) {
         orderId,
         orderName: `Popup ${selectedPlan.label} 이용권`,
         customerEmail: email || undefined,
-        successUrl: `${baseUrl}/payment/success?slug=${slug}`,
+        successUrl: `${baseUrl}/payment/success?slug=${slug}&email=${encodeURIComponent(email)}`,
         failUrl: `${baseUrl}/payment/fail?slug=${slug}`,
       })
     } else {
