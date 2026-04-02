@@ -52,6 +52,12 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ editToken, blocks: newBlocks }),
       })
+      if (res.status === 403) {
+        // 토큰 만료 또는 무효 → localStorage 정리 후 재인증
+        localStorage.removeItem(`popup_token_${slug}`)
+        window.location.reload()
+        return
+      }
       setSaveStatus(res.ok ? 'saved' : 'error')
     } catch {
       // 네트워크 오류

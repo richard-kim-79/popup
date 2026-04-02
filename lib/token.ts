@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken'
 
 const SECRET = process.env.EDIT_TOKEN_SECRET!
-const EXPIRES_IN = '1h'
+const EXPIRES_IN = '30d'
 
 interface EditTokenPayload {
   slug: string
