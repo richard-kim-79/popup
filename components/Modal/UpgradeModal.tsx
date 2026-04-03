@@ -36,7 +36,8 @@ export default function UpgradeModal({ slug, onClose }: Props) {
     try {
       // @ts-expect-error
       const tossPayments = await window.TossPayments((process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? '').trim())
-      const payment = tossPayments.payment({ customerKey: '__anonymous__' })
+      // customerKey: 거래별 고유값 (orderId 재사용 — 2~50자, 영문/숫자/_)
+      const payment = tossPayments.payment({ customerKey: orderId })
 
       await payment.request({
         method: '카드',

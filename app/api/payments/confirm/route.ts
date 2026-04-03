@@ -134,7 +134,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<{ ok: true; sl
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Popup <noreply@popup.bluewhale2025.com>',
+        from: 'Popup <onboarding@resend.dev>',
         to: email,
         subject: `결제 완료 · Popup 페이지 ${PLAN_DAYS[plan]}일 연장`,
         html: `

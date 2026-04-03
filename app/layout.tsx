@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full">
         {children}
-        <script src="https://js.tosspayments.com/v2" defer />
+        <script src="https://js.tosspayments.com/v2/standard" defer />
       </body>
     </html>
   )
