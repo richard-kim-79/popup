@@ -131,6 +131,12 @@ export default function UpgradeModal({ slug, onClose }: Props) {
           >
             이메일로 계속
           </button>
+          <button
+            onClick={() => setStep('pay')}
+            className="mt-3 w-full text-center text-xs text-popup-faint hover:text-popup-muted"
+          >
+            건너뛰기
+          </button>
         </>
       )}
 
@@ -142,6 +148,9 @@ export default function UpgradeModal({ slug, onClose }: Props) {
             <span className="text-sm text-popup-muted">Popup {selectedPlan.label}</span>
             <span className="text-sm font-semibold text-popup-text">{selectedPlan.price}</span>
           </div>
+          {email && (
+            <p className="mb-3 text-center text-xs text-popup-muted">📧 {email}</p>
+          )}
 
           <button
             onClick={handlePay}
