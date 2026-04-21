@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react'
 import Link from 'next/link'
-import Logo from '@/components/UI/Logo'
 
 interface Page { slug: string; title: string; expires_at: string }
 
@@ -39,9 +38,8 @@ export default function MyPagesPage() {
   return (
     <div className="min-h-screen bg-popup-bg">
       <nav className="flex h-12 items-center border-b border-popup-border px-6">
-        <Link href="/" className="flex items-center gap-1.5">
-          <Logo size={18} />
-          <span className="text-sm font-bold text-popup-text">Popup</span>
+        <Link href="/" className="text-sm font-bold text-popup-text">
+          Popup
         </Link>
       </nav>
 
@@ -62,7 +60,7 @@ export default function MyPagesPage() {
           <button
             type="submit"
             disabled={loading || !email.trim()}
-            className="rounded-lg bg-popup-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-popup-accent-hover disabled:opacity-40"
+            className="rounded-lg bg-popup-accent px-4 py-2.5 text-sm font-medium text-popup-accent-fg transition-colors hover:bg-popup-accent-hover disabled:opacity-40"
           >
             {loading ? '검색 중...' : '찾기'}
           </button>
@@ -89,7 +87,7 @@ export default function MyPagesPage() {
                     </div>
                     <div className="ml-4 flex shrink-0 gap-2">
                       <Link href={`/${p.slug}`} className="rounded-md px-3 py-1.5 text-xs text-popup-muted hover:bg-popup-surface">보기</Link>
-                      <Link href={`/${p.slug}/edit`} className="rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-popup-accent-hover">편집</Link>
+                      <Link href={`/${p.slug}/edit`} className="rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover">편집</Link>
                     </div>
                   </div>
                 )

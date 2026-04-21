@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import type { ImageBlock as ImageBlockType, ImageWidth } from '@/types'
 import SizeOverlay, { getWidthClass } from './SizeOverlay'
+import { getSupabaseBrowser } from '@/lib/supabase'
 
 interface Props {
   block: ImageBlockType
@@ -32,7 +33,8 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
   const [progress, setProgress]       = useState(0)
   const [pendingName, setPendingName] = useState('')
   const [showSize, setShowSize]       = useState(false)
-  const uploadingRef = useRef(false)
+  const uploadingRef  = useRef(false)
+  const handledFileRef = useRef<File | undefined>(undefined)
 
   const handleSizeChange = useCallback((w: ImageWidth) => {
     onUpdate(block.id, { width: w })
@@ -55,26 +57,19 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
         },
         body: JSON.stringify({ filename: file.name, mimeType: file.type, size: file.size }),
       })
-      const tokenData = await tokenRes.json() as { signedUrl?: string; publicUrl?: string; filename?: string; error?: string }
-      if (!tokenRes.ok || !tokenData.signedUrl) {
+      const tokenData = await tokenRes.json() as { signedUrl?: string; token?: string; path?: string; publicUrl?: string; filename?: string; error?: string }
+      if (!tokenRes.ok || !tokenData.token || !tokenData.path) {
         alert(tokenData.error ?? '업로드 준비에 실패했습니다.')
         return
       }
 
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open('PUT', tokenData.signedUrl!)
-        xhr.setRequestHeader('Content-Type', file.type)
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100))
-        }
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve()
-          else reject(new Error(`업로드 실패 (${xhr.status})`))
-        }
-        xhr.onerror = () => reject(new Error('네트워크 오류'))
-        xhr.send(file)
-      })
+      setProgress(50)
+      const supabase = getSupabaseBrowser()
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .uploadToSignedUrl(tokenData.path, tokenData.token, file)
+      if (uploadError) throw new Error(uploadError.message)
+      setProgress(100)
 
       onUpdate(block.id, { url: tokenData.publicUrl!, filename: tokenData.filename ?? file.name, width: 'full' })
     } catch (err) {
@@ -87,13 +82,20 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
     }
   }, [block.id, slug, editToken, onUpdate])
 
-  // 초기 파일이 있으면 자동 업로드 시작
+  // initialFile이 변경될 때마다 업로드 트리거
+  // (마운트 시 initialFile이 있을 때 + 외부 드롭으로 나중에 할당될 때 모두 처리)
   useEffect(() => {
-    if (initialFile && !block.url && !uploadingRef.current) {
+    if (
+      initialFile &&
+      !block.url &&
+      !uploadingRef.current &&
+      initialFile !== handledFileRef.current
+    ) {
+      handledFileRef.current = initialFile
       uploadFile(initialFile)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initialFile])
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     const arr = Array.from(files)
@@ -149,7 +151,7 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
             {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
           </div>
           <button onClick={() => onDelete(block.id)}
-            className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+            className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
             삭제
           </button>
         </div>
@@ -182,7 +184,7 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
         </div>
 
         <button onClick={() => onDelete(block.id)}
-          className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+          className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
           삭제
         </button>
       </div>
@@ -229,7 +231,7 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
       )}
 
       <button onClick={(e) => { e.stopPropagation(); onDelete(block.id) }}
-        className="absolute right-2 top-2 text-xs text-popup-muted opacity-0 transition-opacity group-hover:opacity-100">
+        className="absolute right-2 top-2 rounded bg-black/30 px-2 py-0.5 text-xs text-white transition-opacity sm:bg-transparent sm:text-popup-muted sm:opacity-0 sm:group-hover:opacity-100">
         삭제
       </button>
     </div>

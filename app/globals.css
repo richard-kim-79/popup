@@ -1,19 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  /* Popup Design Tokens — Claude cream palette */
-  --color-popup-bg:           #FAF9F6;   /* 크림 베이스 */
-  --color-popup-surface:      #F2EFE9;   /* 살짝 어두운 크림 (카드 배경) */
+  /* Popup Design Tokens — PANTONE 11-4201 TCX Cloud Dancer */
+  --color-popup-bg:           #EDE8E2;   /* Cloud Dancer 베이스 */
+  --color-popup-surface:      #E4DDD6;   /* Cloud Dancer 카드 배경 */
   --color-popup-white:        #FFFFFF;
-  --color-popup-border:       #E4DDD3;   /* 따뜻한 경계선 */
-  --color-popup-border-hover: #CEC7BC;
+  --color-popup-border:       #D6CFC7;   /* 따뜻한 경계선 */
+  --color-popup-border-hover: #C2BAB1;
   --color-popup-text:         #1C1917;   /* 따뜻한 거의-검정 */
   --color-popup-muted:        #8C857B;   /* 따뜻한 회색 */
   --color-popup-faint:        #C9C3BB;   /* 플레이스홀더 */
-  --color-popup-accent:       #2E6B52;   /* 포레스트 그린 */
-  --color-popup-accent-hover: #235440;
-  --color-popup-accent-bg:    #ECF4EF;
-  --color-popup-accent-text:  #1A4A39;
+  --color-popup-accent:       #C9BFCB;   /* PANTONE 13-3802 Orchid Tint */
+  --color-popup-accent-hover: #B5AABB;   /* Orchid Tint 약간 어둡게 */
+  --color-popup-accent-fg:    #2C1F34;   /* accent 버튼 위 전경 텍스트 */
+  --color-popup-accent-bg:    #F4F0F5;   /* 연한 Orchid 배경 */
+  --color-popup-accent-text:  #3A2D42;   /* 텍스트 링크용 accent */
   --color-popup-warn:         #92600A;
   --color-popup-warn-bg:      #FEF8EC;
   --color-popup-warn-border:  #E8C96A;
@@ -50,12 +51,12 @@ button, a { transition-property: color, background-color, border-color, opacity;
 
 /* 드래그 핸들 꾹 누르기 애니메이션 */
 @keyframes drag-charge {
-  0%   { box-shadow: 0 0 0 0px rgba(46, 107, 82, 0.5); transform: scale(1); }
-  60%  { box-shadow: 0 0 0 8px rgba(46, 107, 82, 0.1); transform: scale(1.2); }
-  100% { box-shadow: 0 0 0 10px rgba(46, 107, 82, 0); transform: scale(1.15); }
+  0%   { box-shadow: 0 0 0 0px rgba(201, 191, 203, 0.6); transform: scale(1); }
+  60%  { box-shadow: 0 0 0 8px rgba(201, 191, 203, 0.15); transform: scale(1.2); }
+  100% { box-shadow: 0 0 0 10px rgba(201, 191, 203, 0); transform: scale(1.15); }
 }
 .drag-handle-btn:active {
   animation: drag-charge 250ms ease-out forwards;
-  color: #2E6B52;
-  background-color: #ECF4EF;
+  color: #3A2D42;
+  background-color: #F4F0F5;
 }

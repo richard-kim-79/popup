@@ -11,8 +11,6 @@ import {
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
-  type DraggableSyntheticListeners,
-  type DraggableAttributes,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -79,19 +77,12 @@ function BlockDragCard({ block }: { block: Block }) {
   )
 }
 
-/* ── 드래그 핸들 버튼 ──────────────────────────────── */
-function DragHandle({ listeners, attributes }: {
-  listeners: DraggableSyntheticListeners
-  attributes: DraggableAttributes
-}) {
+/* ── 드래그 핸들 (시각적 표시만 — 리스너는 외부 래퍼에 있음) ── */
+function DragHandle() {
   return (
-    <button
-      type="button"
-      {...listeners}
-      {...attributes}
-      aria-label="길게 눌러서 블록 이동"
-      tabIndex={-1}
-      className="drag-handle-btn mt-0.5 flex h-10 w-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg text-popup-faint transition-colors duration-200 active:cursor-grabbing sm:h-8 sm:w-5 sm:opacity-0 sm:group-hover:opacity-60"
+    <div
+      aria-hidden="true"
+      className="mt-0.5 flex h-10 w-7 shrink-0 cursor-grab items-center justify-center rounded-lg text-popup-faint transition-colors duration-200 active:cursor-grabbing sm:h-8 sm:w-5 sm:opacity-0 sm:group-hover:opacity-60"
     >
       <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
         <circle cx="3.5" cy="2.5" r="1.5" />
@@ -101,7 +92,7 @@ function DragHandle({ listeners, attributes }: {
         <circle cx="3.5" cy="13.5" r="1.5" />
         <circle cx="8.5" cy="13.5" r="1.5" />
       </svg>
-    </button>
+    </div>
   )
 }
 
@@ -121,6 +112,7 @@ function SortableBlock({
   initialFile?: File
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id })
+  // listeners/attributes를 외부 래퍼에 적용 → 모바일에서 블록 전체 영역 길게 눌러서 이동 가능
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -202,8 +194,14 @@ function SortableBlock({
   })()
 
   return (
-    <div ref={setNodeRef} style={style} className="group flex items-start gap-1.5">
-      <DragHandle listeners={listeners} attributes={attributes} />
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group flex items-start gap-1.5"
+      {...listeners}
+      {...attributes}
+    >
+      <DragHandle />
       {/* 드래그 중: 점선 ghost placeholder */}
       {isDragging ? (
         <div className="min-h-[40px] flex-1 rounded-lg border-2 border-dashed border-popup-accent/40 bg-popup-accent-bg/30" />

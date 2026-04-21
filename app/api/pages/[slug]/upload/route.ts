@@ -9,7 +9,7 @@ const ALLOWED_MIME = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   'application/pdf',
 ]
-const MAX_SIZE = 500 * 1024 * 1024 // 500MB
+const MAX_SIZE = parseInt(process.env.UPLOAD_MAX_SIZE ?? '') || 50 * 1024 * 1024 // 기본 50MB (Supabase Free), Pro=5GB
 const BUCKET = 'media'
 
 async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {
@@ -28,6 +28,8 @@ interface SignedUploadRequest {
 
 interface SignedUploadResponse {
   signedUrl: string
+  token: string
+  path: string
   publicUrl: string
   filename: string
 }
@@ -58,7 +60,7 @@ export async function POST(
   }
 
   if (size > MAX_SIZE) {
-    return NextResponse.json({ error: '파일 크기는 500MB 이하여야 합니다.' }, { status: 400 })
+    return NextResponse.json({ error: `파일 크기는 ${Math.round(MAX_SIZE / 1024 / 1024)}MB 이하여야 합니다.` }, { status: 400 })
   }
 
   const supabase = getSupabaseAdmin()
@@ -79,6 +81,8 @@ export async function POST(
 
   return NextResponse.json({
     signedUrl: data.signedUrl,
+    token: data.token,
+    path: data.path,
     publicUrl,
     filename,
   }, { status: 200 })

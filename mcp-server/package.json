@@ -1,0 +1,50 @@
+{
+  "name": "@blueslap/popup-mcp",
+  "version": "1.0.1",
+  "description": "Create and manage Popup web pages via AI — no login required. 30초 만에 웹페이지를 만들고 AI로 편집하세요.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "popup-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "manifest.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "popup",
+    "web-page",
+    "ai",
+    "claude",
+    "page-builder",
+    "no-code"
+  ],
+  "author": "연주미디어 <blueslap@naver.com>",
+  "license": "MIT",
+  "homepage": "https://leaf-bluewhale2025.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/richard-kim-79/popup.git"
+  },
+  "mcpName": "io.github.richard-kim-79/popup-mcp",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

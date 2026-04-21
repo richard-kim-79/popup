@@ -16,7 +16,7 @@ function FailInner() {
         <p className="mb-6 text-sm text-popup-muted">{message}</p>
         <div className="flex justify-center gap-3">
           {slug && (
-            <a href={`/${slug}/edit`} className="rounded-md bg-popup-accent px-5 py-2 text-sm font-medium text-white hover:bg-popup-accent-hover">
+            <a href={`/${slug}/edit`} className="rounded-md bg-popup-accent px-5 py-2 text-sm font-medium text-popup-accent-fg hover:bg-popup-accent-hover">
               에디터로 돌아가기
             </a>
           )}

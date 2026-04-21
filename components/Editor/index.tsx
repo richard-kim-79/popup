@@ -3,13 +3,16 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { nanoid } from 'nanoid'
 import type { ImageBlock as ImageBlockType } from '@/types'
-import Logo from '@/components/UI/Logo'
 import BlockList from './BlockList'
 import BlockAdder from './BlockAdder'
 import LockBanner from './LockBanner'
 import ShareModal from '@/components/Modal/ShareModal'
 import UpgradeModal from '@/components/Modal/UpgradeModal'
 import type { Block, BlockType } from '@/types'
+
+const ACCEPTED_MIME = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
+])
 
 interface Props {
   slug: string
@@ -32,8 +35,9 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const debounceRef      = useRef<ReturnType<typeof setTimeout> | null>(null)
   const blocksRef        = useRef<Block[]>(initialBlocks)
   const pendingFilesRef  = useRef<Map<string, File>>(new Map())
-  const savingRef        = useRef(false)           // 현재 저장 요청 진행 중 여부
-  const pendingBlocksRef = useRef<Block[] | null>(null)  // 저장 중 들어온 최신 blocks
+  const savingRef        = useRef(false)
+  const pendingBlocksRef = useRef<Block[] | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
 
   // ── 핵심 저장 함수 ──────────────────────────────────────────────────
   const save = useCallback(async (newBlocks: Block[]) => {
@@ -165,6 +169,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.id === afterId)
       const next = [...prev]
+      // idx === -1이면 맨 앞(빈 페이지 포함), 아니면 afterId 다음에 삽입
       next.splice(idx + 1, 0, ...newBlocks)
       blocksRef.current = next
       scheduleSave(next)
@@ -175,7 +180,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const handleAdd = useCallback((type: BlockType) => {
     const defaults: Record<BlockType, Partial<Block>> = {
       h1: { content: '' }, h2: { content: '' }, text: { content: '' },
-      image: {}, button: { label: '클릭하세요' }, divider: {},
+      image: {}, button: { label: '클릭하세요', color: sessionStorage.getItem('popup-accent-color') ?? '#2E6B52' }, divider: {},
       youtube: {}, link: {},
     }
     const nb = { id: nanoid(6), type, ...defaults[type] } as Block
@@ -213,14 +218,86 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
     return <span className="h-1.5 w-1.5 rounded-full bg-popup-accent/50" title="저장됨" />
   }
 
+  // ── 전역 드래그&드롭 (window 레벨) ─────────────────────────────────
+  // React 합성 이벤트 대신 window 이벤트를 사용해 자식 요소 진입/이탈 문제 완전 차단
+  useEffect(() => {
+    if (locked) return
+
+    const onWindowDragEnter = (e: globalThis.DragEvent) => {
+      // 외부 파일 드래그만 감지 (브라우저 내부 텍스트 등 제외)
+      if (e.dataTransfer?.types.includes('Files')) setIsDragOver(true)
+    }
+
+    const onWindowDragLeave = (e: globalThis.DragEvent) => {
+      // relatedTarget이 null이면 브라우저 창 밖으로 완전히 벗어난 것
+      if (e.relatedTarget === null) setIsDragOver(false)
+    }
+
+    const onWindowDragOver = (e: globalThis.DragEvent) => {
+      // 브라우저 기본 동작(파일 열기) 방지
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+    }
+
+    const onWindowDrop = (e: globalThis.DragEvent) => {
+      // 오버레이 밖에 드롭 시 브라우저 기본 동작 방지 + 오버레이 숨김
+      e.preventDefault()
+      setIsDragOver(false)
+    }
+
+    window.addEventListener('dragenter', onWindowDragEnter)
+    window.addEventListener('dragleave', onWindowDragLeave)
+    window.addEventListener('dragover', onWindowDragOver)
+    window.addEventListener('drop', onWindowDrop)
+
+    return () => {
+      window.removeEventListener('dragenter', onWindowDragEnter)
+      window.removeEventListener('dragleave', onWindowDragLeave)
+      window.removeEventListener('dragover', onWindowDragOver)
+      window.removeEventListener('drop', onWindowDrop)
+    }
+  }, [locked])
+
+  // 오버레이에서 드롭 처리
+  const handleOverlayDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+
+    const files = Array.from(e.dataTransfer.files).filter((f) => ACCEPTED_MIME.has(f.type))
+    if (files.length === 0) return
+
+    // 기존 빈 이미지 블록(url 없음)을 먼저 채움 → 새 블록 생성 없이 그 자리에서 업로드
+    const emptyImageBlocks = blocksRef.current.filter(
+      (b): b is ImageBlockType => b.type === 'image' && !(b as ImageBlockType).url
+    )
+
+    const filesToFill = files.slice(0, emptyImageBlocks.length)
+    const filesToAdd  = files.slice(emptyImageBlocks.length)
+
+    if (filesToFill.length > 0) {
+      // pendingFilesRef에 할당 후 리렌더 → ImageBlock이 새 initialFile 수신 → 업로드 시작
+      filesToFill.forEach((file, i) => {
+        pendingFilesRef.current.set(emptyImageBlocks[i].id, file)
+      })
+      setBlocks((prev) => [...prev])  // 리렌더 트리거 (데이터 변경 없음)
+    }
+
+    // 빈 블록보다 파일이 더 많으면 새 블록 추가
+    if (filesToAdd.length > 0) {
+      const lastId = blocksRef.current.at(-1)?.id ?? ''
+      handleAddImages(lastId, filesToAdd)
+    }
+  }, [handleAddImages])
+
   return (
-    <div className="min-h-screen bg-popup-bg">
+    <div className="relative min-h-screen bg-popup-bg">
 
       {/* ── 상단바 ── */}
       <div className="sticky top-0 z-[200] flex h-11 items-center justify-between border-b border-popup-border bg-popup-bg/95 px-4 backdrop-blur-sm">
         <div className="flex items-center gap-2.5">
-          <a href="/" className="opacity-60 hover:opacity-100">
-            <Logo size={16} />
+          <a href="/" className="text-sm font-semibold tracking-tight text-popup-text opacity-60 hover:opacity-100">
+            Popup
           </a>
           <SaveIndicator />
         </div>
@@ -236,12 +313,27 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
           )}
           <button
             onClick={() => setShowShare(true)}
-            className="rounded-lg bg-popup-accent px-3.5 py-1.5 text-xs font-medium text-white hover:bg-popup-accent-hover"
+            className="rounded-lg bg-popup-accent px-3.5 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover"
           >
             공유
           </button>
         </div>
       </div>
+
+      {/* ── 드래그 오버레이 (pointer-events: all → 드롭 직접 수신) ── */}
+      {isDragOver && !locked && (
+        <div
+          className="fixed inset-0 z-[500] flex flex-col items-center justify-center bg-popup-accent/10 backdrop-blur-[2px]"
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+          onDrop={handleOverlayDrop}
+        >
+          <div className="rounded-2xl border-2 border-dashed border-popup-accent bg-popup-white/90 px-12 py-10 text-center shadow-lg">
+            <div className="mb-2 text-4xl">📎</div>
+            <p className="text-base font-semibold text-popup-accent">파일을 여기에 놓으세요</p>
+            <p className="mt-1 text-xs text-popup-muted">이미지(JPG·PNG·GIF·WebP) · PDF</p>
+          </div>
+        </div>
+      )}
 
       {/* ── 잠금/경고 배너 ── */}
       {!locked && showBanner && (

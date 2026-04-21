@@ -2,8 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 
 // 토스페이먼츠 웹훅: 결제 상태 동기화
-// 토스페이먼츠는 웹훅 시크릿을 제공하지 않으므로 orderId 기반으로 유효성 확인
+// Authorization 헤더: Basic {Base64(webhookSecret + ":")}
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  // ── 웹훅 서명 검증 ──────────────────────────────────────────
+  const webhookSecret = process.env.TOSS_WEBHOOK_SECRET
+  if (!webhookSecret) {
+    return NextResponse.json({ error: '웹훅 설정 오류입니다.' }, { status: 500 })
+  }
+
+  const expectedAuth = 'Basic ' + Buffer.from(webhookSecret + ':').toString('base64')
+  const authHeader = req.headers.get('authorization')
+  if (authHeader !== expectedAuth) {
+    return NextResponse.json({ error: '인증 실패.' }, { status: 401 })
+  }
+
   let body: { eventType?: string; data?: { orderId?: string; status?: string } }
   try {
     body = await req.json() as typeof body

@@ -4,10 +4,10 @@ interface HeroProps {
 
 export default function Hero({ onStart }: HeroProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-6 pb-20 pt-16 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center px-6 pb-40 pt-64 text-center">
 
       {/* 헤드라인: 딱 한 줄 아이디어 */}
-      <h1 className="mb-4 max-w-md text-[2.6rem] font-bold leading-[1.18] tracking-[-0.04em] text-popup-text">
+      <h1 className="mb-4 max-w-md text-[1.75rem] font-bold leading-[1.18] tracking-[-0.04em] text-popup-text sm:text-[2.6rem]">
         링크 하나로<br />
         웹페이지를 공유해요
       </h1>
@@ -20,7 +20,7 @@ export default function Hero({ onStart }: HeroProps) {
       {/* 단 하나의 CTA */}
       <button
         onClick={onStart}
-        className="rounded-xl bg-popup-accent px-10 py-3.5 text-[15px] font-medium text-white hover:bg-popup-accent-hover active:scale-[.98]"
+        className="rounded-xl bg-popup-accent px-10 py-3.5 text-[15px] font-medium text-popup-accent-fg hover:bg-popup-accent-hover active:scale-[.98]"
       >
         새 페이지 만들기
       </button>

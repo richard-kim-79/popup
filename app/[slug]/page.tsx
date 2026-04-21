@@ -1,13 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import Logo from '@/components/UI/Logo'
 import ReportButton from '@/components/ReportButton'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { daysLeft } from '@/lib/slug'
 import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
 import SocialEmbed from '@/components/Blocks/SocialEmbed'
 import ExpiryUpgradeButton from '@/components/Viewer/ExpiryUpgradeButton'
+import LockedBanner from '@/components/Viewer/LockedBanner'
 
 /** URL에서 hostname 안전하게 추출 */
 function safeHostname(url: string): string {
@@ -38,16 +38,17 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const supabase = getSupabaseAdmin()
-  const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://leaf-bluewhale2025.vercel.app').trim()
+  const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com').trim()
 
   const { data } = await supabase
     .from('pages')
-    .select('blocks')
+    .select('blocks, locked')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
 
   const blocks = ((data?.blocks ?? []) as unknown) as Block[]
+  const isLocked = data?.locked ?? false
 
   // 첫 번째 H1을 제목으로
   const titleBlock = blocks.find((b) => b.type === 'h1' && (b as { content?: string }).content?.trim())
@@ -57,28 +58,43 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // 첫 번째 text 블록을 설명으로
   const textBlock = blocks.find((b) => b.type === 'text' && (b as { content?: string }).content?.trim())
   const description = textBlock
-    ? (textBlock as { content: string }).content.trim().slice(0, 120)
+    ? (textBlock as { content: string }).content.trim().slice(0, 160)
     : '30초 만에 웹페이지를 만들고 링크로 공유하세요'
 
-  // 첫 번째 이미지를 OG 이미지로
-  const imageBlock = blocks.find((b) => b.type === 'image' && (b as { url?: string }).url)
-  const ogImage = imageBlock ? (imageBlock as { url: string }).url : undefined
+  // OG 이미지 우선순위: 이미지 블록 > YouTube 썸네일 > 기본
+  const imageBlock = blocks.find((b) => b.type === 'image' && (b as { url?: string }).url && !(b as { url: string }).url.toLowerCase().endsWith('.pdf'))
+  const youtubeBlock = blocks.find((b) => b.type === 'youtube' && (b as { videoId?: string }).videoId)
+
+  let ogImage: string | undefined
+  if (imageBlock) {
+    ogImage = (imageBlock as { url: string }).url
+  } else if (youtubeBlock) {
+    ogImage = `https://img.youtube.com/vi/${(youtubeBlock as { videoId: string }).videoId}/maxresdefault.jpg`
+  }
 
   const pageUrl = `${BASE}/${slug}`
 
   return {
     title,
     description,
+    // 잠금된 페이지는 검색엔진 색인 제외
+    robots: isLocked ? { index: false, follow: false } : { index: true, follow: true },
+    alternates: {
+      canonical: pageUrl,
+    },
     openGraph: {
       title,
       description,
       url: pageUrl,
       siteName: 'Popup',
-      type: 'website',
-      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
+      type: 'article',
+      locale: 'ko_KR',
+      ...(ogImage
+        ? { images: [{ url: ogImage, width: 1200, height: 630, alt: title }] }
+        : {}),
     },
     twitter: {
-      card: ogImage ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title,
       description,
       ...(ogImage ? { images: [ogImage] } : {}),
@@ -90,13 +106,34 @@ function renderBlock(block: Block) {
   switch (block.type) {
     case 'h1':
       if (!block.content?.trim()) return null
-      return <h1 key={block.id} className="mb-4 text-4xl font-extrabold leading-snug text-popup-text">{block.content}</h1>
+      return (
+        <h1
+          key={block.id}
+          className="mb-4 font-extrabold leading-tight text-popup-text break-words"
+          style={{ fontSize: 'clamp(1.375rem, 5vw, 2.25rem)' }}
+        >
+          {block.content}
+        </h1>
+      )
     case 'h2':
       if (!block.content?.trim()) return null
-      return <h2 key={block.id} className="mb-3 text-2xl font-bold leading-snug text-popup-text">{block.content}</h2>
+      return (
+        <h2
+          key={block.id}
+          className="mb-3 font-bold leading-snug text-popup-text break-words"
+          style={{ fontSize: 'clamp(1.125rem, 3.5vw, 1.5rem)' }}
+        >
+          {block.content}
+        </h2>
+      )
     case 'text':
-      if (!block.content?.trim()) return null
-      return <p key={block.id} className="mb-2 text-base leading-relaxed text-popup-text">{block.content}</p>
+      if (block.content === null || block.content === undefined) return null
+      if (!block.content.trim()) {
+        const newlines = (block.content.match(/\n/g) ?? []).length
+        const spacerRem = Math.max(1, newlines) * 1.5
+        return <div key={block.id} style={{ height: `${spacerRem}rem` }} aria-hidden="true" />
+      }
+      return <p key={block.id} className="mb-2 text-base leading-relaxed text-popup-text whitespace-pre-wrap">{block.content}</p>
     case 'image': {
       if (!block.url) return null
       const displayName = block.filename ?? (() => { try { return decodeURIComponent(block.url!.split('/').pop()?.split('?')[0] ?? '파일') } catch { return '파일' } })()
@@ -133,17 +170,26 @@ function renderBlock(block: Block) {
           <div className={IMG_WIDTH[block.width ?? 'full']}>
             <img src={block.url} alt={displayName} className="w-full rounded-lg object-cover" />
           </div>
-          {block.filename && <p className="mt-1 truncate text-xs text-popup-faint" title={displayName}>{displayName}</p>}
+          {/* 파일명 비표시 — 깔끔한 뷰어 */}
         </div>
       )
     }
-    case 'button':
+    case 'button': {
+      const btnBg   = block.color ?? '#2E6B52'
+      // 밝은 색상이면 어두운 텍스트, 어두운 색상이면 흰 텍스트
+      const r = parseInt(btnBg.slice(1, 3), 16)
+      const g = parseInt(btnBg.slice(3, 5), 16)
+      const b2 = parseInt(btnBg.slice(5, 7), 16)
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b2) / 255
+      const btnText = luminance > 0.55 ? '#1C1917' : '#FFFFFF'
       return (
         <a key={block.id} href={block.href ?? '#'} target={block.href ? '_blank' : undefined} rel="noreferrer"
-          className="mb-3 inline-block rounded-md bg-popup-accent px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-popup-accent-hover">
+          style={{ backgroundColor: btnBg, color: btnText }}
+          className="mb-3 inline-block rounded-md px-6 py-2.5 text-sm font-medium transition-opacity hover:opacity-85">
           {block.label}
         </a>
       )
+    }
     case 'divider':
       return <hr key={block.id} className="my-4 border-popup-border" />
     case 'youtube':
@@ -231,10 +277,11 @@ function renderBlock(block: Block) {
 export default async function ViewerPage({ params }: Props) {
   const { slug } = await params
   const supabase = getSupabaseAdmin()
+  const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com').trim()
 
   const { data, error } = await supabase
     .from('pages')
-    .select('blocks, locked, expires_at, deleted_at, report_count')
+    .select('blocks, locked, expires_at, deleted_at, report_count, created_at, updated_at')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
@@ -245,13 +292,42 @@ export default async function ViewerPage({ params }: Props) {
   const blocks = (data.blocks as unknown) as Block[]
   const remaining = daysLeft(data.expires_at)
 
+  // JSON-LD 구조화 데이터
+  const titleBlock = blocks.find((b) => b.type === 'h1' && (b as { content?: string }).content?.trim())
+  const pageTitle = titleBlock ? (titleBlock as { content: string }).content.trim() : 'Popup 페이지'
+  const textBlock = blocks.find((b) => b.type === 'text' && (b as { content?: string }).content?.trim())
+  const pageDesc = textBlock
+    ? (textBlock as { content: string }).content.trim().slice(0, 160)
+    : '30초 만에 웹페이지를 만들고 링크로 공유하세요'
+  const imageBlock = blocks.find((b) => b.type === 'image' && (b as { url?: string }).url && !(b as { url: string }).url.toLowerCase().endsWith('.pdf'))
+  const ogImage = imageBlock ? (imageBlock as { url: string }).url : undefined
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: pageTitle,
+    description: pageDesc,
+    url: `${BASE}/${slug}`,
+    ...(ogImage ? { image: ogImage } : {}),
+    datePublished: data.created_at ?? undefined,
+    dateModified: data.updated_at ?? undefined,
+    publisher: {
+      '@type': 'Organization',
+      name: 'Popup',
+      url: BASE,
+    },
+  }
+
   return (
     <div className="min-h-screen bg-popup-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Minimal nav */}
       <nav className="flex h-12 items-center justify-between border-b border-popup-border px-6">
-        <Link href="/" className="flex items-center gap-1.5">
-          <Logo size={18} />
-          <span className="text-sm font-bold text-popup-text">Popup</span>
+        <Link href="/" className="text-sm font-bold text-popup-text">
+          Popup
         </Link>
         {data.locked && (
           <span className="rounded bg-popup-warn-bg px-2 py-0.5 text-xs text-popup-warn">🔒 잠금됨</span>
@@ -259,12 +335,7 @@ export default async function ViewerPage({ params }: Props) {
       </nav>
 
       {/* Locked banner */}
-      {data.locked && (
-        <div className="border-b border-popup-warn-border bg-popup-warn-bg px-6 py-3 text-center text-sm text-popup-warn">
-          이 페이지는 잠겨있습니다.{' '}
-          <Link href={`/${slug}/edit`} className="font-medium underline">잠금 해제하기</Link>
-        </div>
-      )}
+      {data.locked && <LockedBanner slug={slug} />}
 
       {/* Content */}
       <div className="mx-auto max-w-[700px] px-6 py-14">

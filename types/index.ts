@@ -30,6 +30,7 @@ export interface ButtonBlock extends BaseBlock {
   type: 'button'
   label: string
   href?: string
+  color?: string   // hex — 버튼 배경색 (미지정 시 accent 그린)
 }
 
 export interface DividerBlock extends BaseBlock {
@@ -136,6 +137,27 @@ export interface ApiError {
   error: string
 }
 
+// --- API Key ---
+
+export type ApiKeyScope =
+  | 'pages:create'
+  | 'pages:read'
+  | 'pages:update'
+  | 'pages:delete'
+  | 'uploads:create'
+
+export interface ApiKey {
+  id: string
+  prefix: string
+  name: string
+  scopes: ApiKeyScope[]
+  rate_limit: number
+  created_at: string
+  last_used_at: string | null
+  revoked_at: string | null
+  expires_at: string | null
+}
+
 // --- Supabase Database types ---
 // Format matches Supabase JS v2 generated type schema.
 // Full types: supabase gen types typescript --project-id <id>
@@ -158,6 +180,7 @@ export type Database = {
           view_count: number
           deleted_at: string | null
           report_count: number
+          api_key_id: string | null
           created_at: string
           updated_at: string
         }
@@ -173,6 +196,7 @@ export type Database = {
           view_count?: number
           deleted_at?: string | null
           report_count?: number
+          api_key_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -188,6 +212,7 @@ export type Database = {
           view_count?: number
           deleted_at?: string | null
           report_count?: number
+          api_key_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -287,6 +312,76 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'page_emails_page_id_fkey'
+            columns: ['page_id']
+            referencedRelation: 'pages'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      api_keys: {
+        Row: {
+          id: string
+          key_hash: string
+          prefix: string
+          name: string
+          scopes: string[]
+          rate_limit: number
+          created_at: string
+          last_used_at: string | null
+          revoked_at: string | null
+          expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          key_hash: string
+          prefix: string
+          name?: string
+          scopes?: string[]
+          rate_limit?: number
+          created_at?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          key_hash?: string
+          prefix?: string
+          name?: string
+          scopes?: string[]
+          rate_limit?: number
+          created_at?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          expires_at?: string | null
+        }
+        Relationships: []
+      }
+      api_key_pages: {
+        Row: {
+          api_key_id: string
+          page_id: string
+          created_at: string
+        }
+        Insert: {
+          api_key_id: string
+          page_id: string
+          created_at?: string
+        }
+        Update: {
+          api_key_id?: string
+          page_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'api_key_pages_api_key_id_fkey'
+            columns: ['api_key_id']
+            referencedRelation: 'api_keys'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'api_key_pages_page_id_fkey'
             columns: ['page_id']
             referencedRelation: 'pages'
             referencedColumns: ['id']

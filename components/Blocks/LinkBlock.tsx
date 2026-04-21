@@ -120,8 +120,8 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
     return (
       <div className="group relative">
         <SocialEmbed embedType={block.embedType} embedId={block.embedId} url={block.url} />
-        {/* hover 수정·삭제 버튼 */}
-        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        {/* 수정·삭제 버튼 (모바일: 항상 표시 / 데스크톱: hover 시) */}
+        <div className="absolute right-2 top-2 flex items-center gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
           <button
             onClick={() => {
               setInputUrl(block.url ?? '')
@@ -225,8 +225,8 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
           {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
         </div>
 
-        {/* hover 시 수정·삭제 버튼 */}
-        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        {/* 수정·삭제 버튼 (모바일: 항상 표시 / 데스크톱: hover 시) */}
+        <div className="absolute right-2 top-2 flex items-center gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
           <button
             onClick={(e) => {
               e.preventDefault()
@@ -270,7 +270,7 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
         <button
           onClick={handleSubmit}
           disabled={loading}
-          className="shrink-0 rounded-lg bg-popup-accent px-3 py-2 text-xs font-medium text-white hover:bg-popup-accent-hover disabled:opacity-40"
+          className="shrink-0 rounded-lg bg-popup-accent px-3 py-2 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover disabled:opacity-40"
         >
           {loading ? '...' : '삽입'}
         </button>
@@ -278,9 +278,9 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
       {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
       <button
         onClick={() => onDelete(block.id)}
-        className="absolute right-2 top-2 text-xs text-popup-faint opacity-0 transition-opacity group-hover:opacity-100"
+        className="absolute right-2 top-2 rounded bg-black/30 px-2 py-0.5 text-xs text-white transition-opacity sm:bg-transparent sm:text-popup-faint sm:opacity-0 sm:group-hover:opacity-100"
       >
-        ×
+        삭제
       </button>
     </div>
   )

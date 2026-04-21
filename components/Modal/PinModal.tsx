@@ -54,7 +54,7 @@ export default function PinModal(props: PinModalProps) {
     <Modal onClose={props.onClose} maxWidth={340}>
       {/* 컴팩트 — 헤더 제거, 인풋이 첫 번째 시각 요소 */}
       <p className="mb-3 text-sm text-popup-muted">
-        {props.mode === 'set' ? 'PIN 설정 (분실 시 복구 불가)' : 'PIN을 입력하세요'}
+        {props.mode === 'set' ? '수정 비밀번호를 만들어주세요 🔑' : '수정하려면 비밀번호를 입력해주세요'}
       </p>
 
       <input
@@ -74,9 +74,9 @@ export default function PinModal(props: PinModalProps) {
       <button
         onClick={handleSubmit}
         disabled={loading || pin.length < 4}
-        className="w-full rounded-lg bg-popup-accent py-2.5 text-sm font-medium text-white hover:bg-popup-accent-hover disabled:opacity-40"
+        className="w-full rounded-lg bg-popup-accent py-2.5 text-sm font-medium text-popup-accent-fg hover:bg-popup-accent-hover disabled:opacity-40"
       >
-        {loading ? '…' : props.mode === 'set' ? '설정하고 시작' : '편집 시작'}
+        {loading ? '…' : props.mode === 'set' ? '완료' : '편집 시작'}
       </button>
     </Modal>
   )

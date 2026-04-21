@@ -24,12 +24,18 @@ export async function GET(req: NextRequest): Promise<NextResponse<{ ok: true; sl
   }
 
   // orderId 형식: {slug}_{plan}_{timestamp}  (e.g. UWPdqi_month_1712345678000)
-  const parts = orderId.split('_')
-  if (parts.length < 3) {
+  // slug에 '_'가 포함될 수 있으므로 끝에서부터 파싱
+  const lastUnderscore2 = orderId.lastIndexOf('_')
+  if (lastUnderscore2 === -1) {
     return NextResponse.json({ error: '잘못된 주문 ID입니다.' }, { status: 400 })
   }
-  const slug = parts[0]
-  const plan = parts[1] as 'month' | 'year'
+  const remaining = orderId.slice(0, lastUnderscore2)
+  const lastUnderscore1 = remaining.lastIndexOf('_')
+  if (lastUnderscore1 === -1) {
+    return NextResponse.json({ error: '잘못된 주문 ID입니다.' }, { status: 400 })
+  }
+  const slug = remaining.slice(0, lastUnderscore1)
+  const plan = remaining.slice(lastUnderscore1 + 1) as 'month' | 'year'
 
   if (!PLAN_DAYS[plan]) {
     return NextResponse.json({ error: '잘못된 플랜입니다.' }, { status: 400 })

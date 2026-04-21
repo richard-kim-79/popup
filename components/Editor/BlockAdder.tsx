@@ -101,7 +101,7 @@ export default function BlockAdder({ onAdd }: Props) {
           aria-label="블록 추가"
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-sm leading-none transition-all ${
             open
-              ? 'border-popup-accent bg-popup-accent text-white'
+              ? 'border-popup-accent bg-popup-accent text-popup-accent-fg'
               : 'border-popup-border text-popup-faint hover:border-popup-muted hover:text-popup-muted'
           }`}
         >

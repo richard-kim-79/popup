@@ -10,7 +10,7 @@ export default function DividerBlock({ id, onDelete }: Props) {
       <button
         onClick={() => onDelete(id)}
         aria-label="블록 삭제"
-        className="flex h-5 w-5 items-center justify-center rounded text-popup-faint opacity-0 transition-opacity hover:bg-popup-surface hover:text-popup-muted group-hover:opacity-100"
+        className="flex h-7 w-7 items-center justify-center rounded text-popup-faint transition-opacity hover:bg-popup-surface hover:text-popup-muted sm:h-5 sm:w-5 sm:opacity-0 sm:group-hover:opacity-100"
       >
         ×
       </button>

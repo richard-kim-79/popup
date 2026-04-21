@@ -1,0 +1,30 @@
+{
+  "name": "Popup — Web Page Creator",
+  "version": "1.0.0",
+  "description": "30초 만에 웹페이지를 만들고 AI로 편집하세요. 로그인 불필요.",
+  "author": "연주미디어",
+  "homepage": "https://leaf-bluewhale2025.vercel.app",
+  "privacyPolicyUrl": "https://leaf-bluewhale2025.vercel.app/privacy",
+  "icon": "icon.png",
+  "entrypoint": "dist/index.js",
+  "runtime": "node",
+  "configSchema": {
+    "MCP_API_KEY": {
+      "type": "string",
+      "description": "Popup API Key — https://leaf-bluewhale2025.vercel.app/admin 에서 발급",
+      "required": true,
+      "secret": true
+    }
+  },
+  "tools": [
+    "create_page",
+    "get_page",
+    "update_page_blocks",
+    "edit_page_blocks",
+    "delete_page",
+    "list_my_pages",
+    "list_templates",
+    "create_page_from_template",
+    "upload_image"
+  ]
+}
