@@ -154,13 +154,8 @@ export default function UpgradeModal({ slug, onClose }: Props) {
       {step === 'auth' && (
         <>
           <button onClick={() => setStep('plan')} className="mb-4 text-xs text-popup-muted hover:text-popup-text">← 뒤로</button>
-          <p className="mb-4 text-sm text-popup-muted">이메일로 페이지를 관리하세요</p>
-
-          <div className="my-3 flex items-center gap-2">
-            <hr className="flex-1 border-popup-border" />
-            <span className="text-[11px] text-popup-faint">이메일 입력</span>
-            <hr className="flex-1 border-popup-border" />
-          </div>
+          <p className="mb-1 text-sm font-semibold text-popup-text">이메일 (선택)</p>
+          <p className="mb-4 text-xs text-popup-muted">결제 확인 이메일을 받을 주소를 입력하세요.</p>
 
           <input
             type="email"
@@ -169,19 +164,13 @@ export default function UpgradeModal({ slug, onClose }: Props) {
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') setStep('pay') }}
             className="mb-2.5 w-full rounded-lg border border-popup-border bg-popup-surface px-3 py-2.5 text-sm text-popup-text outline-none transition-colors focus:border-popup-accent"
+            autoFocus
           />
           <button
             onClick={() => setStep('pay')}
-            disabled={!email}
-            className="w-full rounded-lg bg-popup-accent py-2.5 text-sm font-medium text-popup-accent-fg hover:bg-popup-accent-hover disabled:opacity-40"
+            className="w-full rounded-lg bg-popup-accent py-2.5 text-sm font-medium text-popup-accent-fg hover:bg-popup-accent-hover"
           >
-            이메일로 계속
-          </button>
-          <button
-            onClick={() => setStep('pay')}
-            className="mt-3 w-full text-center text-xs text-popup-faint hover:text-popup-muted"
-          >
-            건너뛰기
+            {email ? '이메일로 계속' : '건너뛰고 결제'}
           </button>
         </>
       )}
