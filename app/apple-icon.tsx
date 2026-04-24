@@ -1,19 +1,18 @@
 import { ImageResponse } from 'next/og'
 
 export const runtime = 'edge'
-export const size = { width: 32, height: 32 }
+export const size = { width: 180, height: 180 }
 export const contentType = 'image/png'
 
-// 브라우저 탭 & 구글 검색 파비콘 — 초록 배경 + 흰 카드
-export default function Icon() {
+// iOS 홈화면 아이콘 (180×180) — 초록 배경 + 흰 카드
+export default function AppleIcon() {
   return new ImageResponse(
     (
       <div
         style={{
-          width: 32,
-          height: 32,
+          width: 180,
+          height: 180,
           background: '#2A6049',
-          borderRadius: 7,
           display: 'flex',
           position: 'relative',
         }}
@@ -22,24 +21,24 @@ export default function Icon() {
         <div
           style={{
             position: 'absolute',
-            left: 4, top: 13,
-            width: 13, height: 13,
-            borderRadius: 3.5,
-            background: 'rgba(255,255,255,0.30)',
+            left: 28, top: 76,
+            width: 76, height: 76,
+            borderRadius: 19,
+            background: 'rgba(255,255,255,0.28)',
           }}
         />
         {/* 앞 팝업 카드 */}
         <div
           style={{
             position: 'absolute',
-            left: 14, top: 6,
-            width: 13, height: 13,
-            borderRadius: 3.5,
+            left: 76, top: 28,
+            width: 76, height: 76,
+            borderRadius: 19,
             background: 'white',
           }}
         />
       </div>
     ),
-    { width: 32, height: 32 }
+    { width: 180, height: 180 }
   )
 }
