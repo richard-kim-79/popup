@@ -1,0 +1,15 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 라이트모드: 그린 계열 / 다크모드: 라이트 그린 -->
+  <style>
+    .back { fill: rgba(42, 96, 73, 0.22); }
+    .front { fill: #2A6049; }
+    @media (prefers-color-scheme: dark) {
+      .back { fill: rgba(111, 188, 152, 0.25); }
+      .front { fill: #6FBC98; }
+    }
+  </style>
+  <!-- 뒤 카드 -->
+  <rect x="2" y="10" class="back" width="17" height="17" rx="4.5"/>
+  <!-- 앞 팝업 카드 -->
+  <rect x="12" y="3" class="front" width="17" height="17" rx="4.5"/>
+</svg>

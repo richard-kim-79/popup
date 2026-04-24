@@ -5,6 +5,7 @@ export const alt = 'Popup — 30초 만에 웹페이지 만들기'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
+// 구글 검색 / SNS 공유 시 노출되는 OG 이미지
 export default function OgImage() {
   return new ImageResponse(
     (
@@ -20,37 +21,54 @@ export default function OgImage() {
           fontFamily: 'sans-serif',
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-            marginBottom: '40px',
-          }}
-        >
+        {/* 로고 마크 — 두 카드 겹침 */}
+        <div style={{ position: 'relative', width: 120, height: 120, marginBottom: 40, display: 'flex' }}>
+          {/* 뒤 카드 */}
           <div
             style={{
-              width: '64px',
-              height: '64px',
-              background: '#2A6049',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: '32px',
-              fontWeight: 800,
+              position: 'absolute',
+              left: 0, top: 36,
+              width: 72, height: 72,
+              borderRadius: 18,
+              background: 'rgba(42, 96, 73, 0.22)',
             }}
-          >
-            P
-          </div>
-          <span style={{ fontSize: '48px', fontWeight: 800, color: '#1A1812' }}>
-            Popup
-          </span>
+          />
+          {/* 앞 팝업 카드 */}
+          <div
+            style={{
+              position: 'absolute',
+              left: 44, top: 0,
+              width: 72, height: 72,
+              borderRadius: 18,
+              background: '#2A6049',
+            }}
+          />
         </div>
-        <p style={{ fontSize: '28px', color: '#A09D92', margin: 0 }}>
+
+        {/* 워드마크 */}
+        <div
+          style={{
+            fontSize: 72,
+            fontWeight: 800,
+            color: '#1A1812',
+            letterSpacing: '-2px',
+            marginBottom: 20,
+            display: 'flex',
+          }}
+        >
+          Popup
+        </div>
+
+        {/* 태그라인 */}
+        <div
+          style={{
+            fontSize: 28,
+            color: '#A09D92',
+            display: 'flex',
+          }}
+        >
           30초 만에 웹페이지를 만들고 링크로 공유하세요
-        </p>
+        </div>
       </div>
     ),
     { ...size }

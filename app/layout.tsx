@@ -52,6 +52,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko" className="h-full">
       <head>
+        {/* SVG 파비콘: 라이트/다크모드 자동 전환 */}
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
