@@ -1,0 +1,16 @@
+<svg width="1932" height="828" viewBox="0 0 1932 828" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 배경 -->
+  <rect width="1932" height="828" fill="#F7F5F0"/>
+
+  <!-- 로고 마크 (중앙 기준 왼쪽) -->
+  <!-- 뒤 카드 -->
+  <rect x="696" y="364" width="168" height="168" rx="42" fill="#2A6049" opacity="0.20"/>
+  <!-- 앞 팝업 카드 -->
+  <rect x="794" y="280" width="168" height="168" rx="42" fill="#2A6049"/>
+
+  <!-- 워드마크 -->
+  <text x="1030" y="460" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="140" font-weight="800" fill="#1A1812" letter-spacing="-4">Popup</text>
+
+  <!-- 태그라인 -->
+  <text x="1033" y="530" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="36" fill="#A09D92" letter-spacing="-0.5">30초 만에 웹페이지를 만들고 링크로 공유하세요</text>
+</svg>
