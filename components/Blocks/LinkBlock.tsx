@@ -201,7 +201,7 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
                 </>
               )}
 
-              {/* 대: 제목 + 설명 + 호스트명 */}
+              {/* 대: 제목 + 설명 */}
               {w === 'full' && (
                 <>
                   <div className="min-w-0 flex-1">
@@ -213,7 +213,6 @@ export default function LinkBlock({ block, onUpdate, onDelete }: Props) {
                         {decodeEntities(block.description)}
                       </p>
                     )}
-                    <p className="mt-1 truncate text-xs text-popup-faint">{safeHostname(block.url)}</p>
                   </div>
                   {arrowIcon}
                 </>

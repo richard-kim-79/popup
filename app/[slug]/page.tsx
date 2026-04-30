@@ -253,13 +253,12 @@ function renderBlock(block: Block) {
                   {arrowIcon}
                 </>
               )}
-              {/* 대: title + description + hostname */}
+              {/* 대: title + description */}
               {lw === 'full' && (
                 <>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-popup-text">{decodeHtmlEntities(block.title ?? '')}</p>
                     {block.description && <p className="mt-0.5 line-clamp-2 text-xs text-popup-muted">{decodeHtmlEntities(block.description)}</p>}
-                    <p className="mt-1 truncate text-xs text-popup-faint">{safeHostname(block.url)}</p>
                   </div>
                   {arrowIcon}
                 </>
