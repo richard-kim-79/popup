@@ -14,6 +14,8 @@ const ACCEPTED_MIME = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
 ])
 
+const HISTORY_LIMIT = 50
+
 interface Props {
   slug: string
   editToken: string
@@ -31,13 +33,44 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const [showBanner, setShowBanner] = useState(daysLeft <= 7 && !locked)
   const [showShare, setShowShare] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
 
-  const debounceRef      = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const blocksRef        = useRef<Block[]>(initialBlocks)
-  const pendingFilesRef  = useRef<Map<string, File>>(new Map())
-  const savingRef        = useRef(false)
-  const pendingBlocksRef = useRef<Block[] | null>(null)
+  const debounceRef        = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const blocksRef          = useRef<Block[]>(initialBlocks)
+  const pendingFilesRef    = useRef<Map<string, File>>(new Map())
+  const savingRef          = useRef(false)
+  const pendingBlocksRef   = useRef<Block[] | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+
+  // ── 히스토리 (undo/redo) ─────────────────────────────────────────────
+  const historyRef        = useRef<Block[][]>([initialBlocks])
+  const historyIndexRef   = useRef<number>(0)
+  const historyDebounce   = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const syncHistoryState = useCallback(() => {
+    setCanUndo(historyIndexRef.current > 0)
+    setCanRedo(historyIndexRef.current < historyRef.current.length - 1)
+  }, [])
+
+  /** 히스토리 스냅샷 추가 (즉시) */
+  const pushHistory = useCallback((newBlocks: Block[]) => {
+    const sliced = historyRef.current.slice(0, historyIndexRef.current + 1)
+    sliced.push(newBlocks)
+    if (sliced.length > HISTORY_LIMIT) sliced.shift()
+    historyRef.current = sliced
+    historyIndexRef.current = sliced.length - 1
+    syncHistoryState()
+  }, [syncHistoryState])
+
+  /** 텍스트 입력용 디바운스 히스토리 (300ms) */
+  const pushHistoryDebounced = useCallback((newBlocks: Block[]) => {
+    if (historyDebounce.current) clearTimeout(historyDebounce.current)
+    historyDebounce.current = setTimeout(() => {
+      historyDebounce.current = null
+      pushHistory(newBlocks)
+    }, 300)
+  }, [pushHistory])
 
   // ── 핵심 저장 함수 ──────────────────────────────────────────────────
   const save = useCallback(async (newBlocks: Block[]) => {
@@ -128,9 +161,10 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       const next = prev.map((b) => b.id === id ? { ...b, ...patch } : b) as Block[]
       blocksRef.current = next
       scheduleSave(next)
+      pushHistoryDebounced(next)   // 텍스트 입력은 300ms 디바운스 후 스냅샷
       return next
     })
-  }, [scheduleSave])
+  }, [scheduleSave, pushHistoryDebounced])
 
   const handleDelete = useCallback((id: string) => {
     setBlocks((prev) => {
@@ -140,9 +174,10 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       blocksRef.current = next
       setSelectedId(next[Math.max(0, idx - 1)]?.id ?? null)
       scheduleSave(next)
+      pushHistory(next)            // 삭제는 즉시 스냅샷
       return next
     })
-  }, [scheduleSave])
+  }, [scheduleSave, pushHistory])
 
   const handleAddBelow = useCallback((id: string) => {
     const nb: Block = { id: nanoid(6), type: 'text', content: '' }
@@ -152,16 +187,18 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       next.splice(idx + 1, 0, nb)
       blocksRef.current = next
       scheduleSave(next)
+      pushHistory(next)            // 추가는 즉시 스냅샷
       return next
     })
     setTimeout(() => setSelectedId(nb.id), 0)
-  }, [scheduleSave])
+  }, [scheduleSave, pushHistory])
 
   const handleReorder = useCallback((newBlocks: Block[]) => {
     setBlocks(newBlocks)
     blocksRef.current = newBlocks
     scheduleSave(newBlocks)
-  }, [scheduleSave])
+    pushHistory(newBlocks)         // 순서 변경은 즉시 스냅샷
+  }, [scheduleSave, pushHistory])
 
   const handleAddImages = useCallback((afterId: string, files: File[]) => {
     const newBlocks: Block[] = files.map(() => ({ id: nanoid(6), type: 'image' } as ImageBlockType))
@@ -169,13 +206,13 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.id === afterId)
       const next = [...prev]
-      // idx === -1이면 맨 앞(빈 페이지 포함), 아니면 afterId 다음에 삽입
       next.splice(idx + 1, 0, ...newBlocks)
       blocksRef.current = next
       scheduleSave(next)
+      pushHistory(next)            // 이미지 추가는 즉시 스냅샷
       return next
     })
-  }, [scheduleSave])
+  }, [scheduleSave, pushHistory])
 
   const handleAdd = useCallback((type: BlockType) => {
     const defaults: Record<BlockType, Partial<Block>> = {
@@ -188,10 +225,48 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       const next = [...prev, nb]
       blocksRef.current = next
       scheduleSave(next)
+      pushHistory(next)            // 블록 추가는 즉시 스냅샷
       return next
     })
     setTimeout(() => setSelectedId(nb.id), 0)
-  }, [scheduleSave])
+  }, [scheduleSave, pushHistory])
+
+  // ── Undo / Redo ───────────────────────────────────────────────────────
+  const handleUndo = useCallback(() => {
+    if (historyIndexRef.current <= 0) return
+    historyIndexRef.current -= 1
+    const restored = historyRef.current[historyIndexRef.current]
+    setBlocks(restored)
+    blocksRef.current = restored
+    scheduleSave(restored)
+    syncHistoryState()
+  }, [scheduleSave, syncHistoryState])
+
+  const handleRedo = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return
+    historyIndexRef.current += 1
+    const restored = historyRef.current[historyIndexRef.current]
+    setBlocks(restored)
+    blocksRef.current = restored
+    scheduleSave(restored)
+    syncHistoryState()
+  }, [scheduleSave, syncHistoryState])
+
+  // ── 키보드 단축키 (Cmd+Z / Cmd+Shift+Z) ────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        handleUndo()
+      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+        e.preventDefault()
+        handleRedo()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [handleUndo, handleRedo])
 
   // ── 저장 상태 UI ─────────────────────────────────────────────────────
   const SaveIndicator = () => {
@@ -303,6 +378,32 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Undo / Redo 버튼 */}
+          <div className="flex items-center">
+            <button
+              onClick={handleUndo}
+              disabled={!canUndo}
+              title="실행 취소 (⌘Z)"
+              className="rounded-md p-1.5 text-popup-muted hover:bg-popup-border hover:text-popup-text disabled:opacity-25 disabled:cursor-not-allowed"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 14 4 9l5-5"/>
+                <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
+              </svg>
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={!canRedo}
+              title="다시 실행 (⌘⇧Z)"
+              className="rounded-md p-1.5 text-popup-muted hover:bg-popup-border hover:text-popup-text disabled:opacity-25 disabled:cursor-not-allowed"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m15 14 5-5-5-5"/>
+                <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
+              </svg>
+            </button>
+          </div>
+
           {locked && (
             <button
               onClick={() => setShowUpgrade(true)}
