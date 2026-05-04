@@ -187,6 +187,7 @@ export type Database = {
           listing_title: string | null
           listing_description: string | null
           listed_at: string | null
+          search_vector: string | null
         }
         Insert: {
           id?: string
@@ -207,6 +208,7 @@ export type Database = {
           listing_title?: string | null
           listing_description?: string | null
           listed_at?: string | null
+          search_vector?: string | null
         }
         Update: {
           id?: string
@@ -227,6 +229,7 @@ export type Database = {
           listing_title?: string | null
           listing_description?: string | null
           listed_at?: string | null
+          search_vector?: string | null
         }
         Relationships: []
       }
