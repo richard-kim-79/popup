@@ -183,6 +183,10 @@ export type Database = {
           api_key_id: string | null
           created_at: string
           updated_at: string
+          listed: boolean
+          listing_title: string | null
+          listing_description: string | null
+          listed_at: string | null
         }
         Insert: {
           id?: string
@@ -199,6 +203,10 @@ export type Database = {
           api_key_id?: string | null
           created_at?: string
           updated_at?: string
+          listed?: boolean
+          listing_title?: string | null
+          listing_description?: string | null
+          listed_at?: string | null
         }
         Update: {
           id?: string
@@ -215,6 +223,10 @@ export type Database = {
           api_key_id?: string | null
           created_at?: string
           updated_at?: string
+          listed?: boolean
+          listing_title?: string | null
+          listing_description?: string | null
+          listed_at?: string | null
         }
         Relationships: []
       }
