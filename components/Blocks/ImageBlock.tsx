@@ -1,9 +1,8 @@
 'use client'
 
 import { useRef, useState, useCallback, useEffect } from 'react'
-import type { ImageBlock as ImageBlockType, ImageWidth } from '@/types'
+import type { ImageBlock as ImageBlockType, ImageWidth, MediaType } from '@/types'
 import SizeOverlay, { getWidthClass } from './SizeOverlay'
-import { getSupabaseBrowser } from '@/lib/supabase'
 
 interface Props {
   block: ImageBlockType
@@ -15,25 +14,65 @@ interface Props {
   initialFile?: File
 }
 
-/** URL에서 파일명 추출 — 한글/영문/특수문자 모두 처리 */
+/** URL에서 파일명 추출 */
 function getFilename(url: string, fallback?: string): string {
   if (fallback) return fallback
-  try {
-    return decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? '파일')
-  } catch {
-    return url.split('/').pop() ?? '파일'
-  }
+  try { return decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? '파일') }
+  catch { return url.split('/').pop() ?? '파일' }
 }
 
-function isPDF(url: string) { return url.toLowerCase().endsWith('.pdf') }
+const PDF_EXT = /\.pdf$/i
+const VIDEO_EXT = /\.(mp4|mov|webm|m4v)$/i
 
-export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete, onAddFilesBelow, initialFile }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
+const VIDEO_MIME = new Set([
+  'video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v',
+])
+
+function detectMediaType(url: string, mediaType?: MediaType): MediaType {
+  if (mediaType) return mediaType
+  if (PDF_EXT.test(url)) return 'pdf'
+  if (VIDEO_EXT.test(url)) return 'video'
+  return 'image'
+}
+
+function mimeToMediaType(mime: string): MediaType {
+  if (mime === 'application/pdf') return 'pdf'
+  if (VIDEO_MIME.has(mime)) return 'video'
+  return 'image'
+}
+
+/** XHR 기반 업로드 (실시간 진행률) */
+function uploadViaXhr(
+  signedUrl: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', signedUrl)
+    xhr.setRequestHeader('Content-Type', file.type)
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else reject(new Error(`업로드 실패 (${xhr.status})`))
+    }
+    xhr.onerror = () => reject(new Error('네트워크 오류'))
+    xhr.onabort = () => reject(new Error('업로드가 취소됐습니다.'))
+    xhr.send(file)
+  })
+}
+
+export default function ImageBlock({
+  block, slug, editToken, onUpdate, onDelete, onAddFilesBelow, initialFile
+}: Props) {
+  const inputRef        = useRef<HTMLInputElement>(null)
   const [uploading, setUploading]     = useState(false)
   const [progress, setProgress]       = useState(0)
   const [pendingName, setPendingName] = useState('')
   const [showSize, setShowSize]       = useState(false)
-  const uploadingRef  = useRef(false)
+  const uploadingRef   = useRef(false)
   const handledFileRef = useRef<File | undefined>(undefined)
 
   const handleSizeChange = useCallback((w: ImageWidth) => {
@@ -49,29 +88,32 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
     setProgress(0)
 
     try {
+      // ① Signed URL 발급
       const tokenRes = await fetch(`/api/pages/${slug}/upload`, {
         method: 'POST',
-        headers: {
-          'x-edit-token': editToken,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'x-edit-token': editToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: file.name, mimeType: file.type, size: file.size }),
       })
-      const tokenData = await tokenRes.json() as { signedUrl?: string; token?: string; path?: string; publicUrl?: string; filename?: string; error?: string }
-      if (!tokenRes.ok || !tokenData.token || !tokenData.path) {
+      const tokenData = await tokenRes.json() as {
+        signedUrl?: string; token?: string; path?: string
+        publicUrl?: string; filename?: string; isVideo?: boolean; error?: string
+      }
+
+      if (!tokenRes.ok || !tokenData.signedUrl || !tokenData.publicUrl) {
         alert(tokenData.error ?? '업로드 준비에 실패했습니다.')
         return
       }
 
-      setProgress(50)
-      const supabase = getSupabaseBrowser()
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .uploadToSignedUrl(tokenData.path, tokenData.token, file)
-      if (uploadError) throw new Error(uploadError.message)
-      setProgress(100)
+      // ② XHR 업로드 (실시간 진행률)
+      await uploadViaXhr(tokenData.signedUrl, file, setProgress)
 
-      onUpdate(block.id, { url: tokenData.publicUrl!, filename: tokenData.filename ?? file.name, width: 'full' })
+      // ③ 블록 업데이트 (mediaType 포함)
+      onUpdate(block.id, {
+        url: tokenData.publicUrl,
+        filename: tokenData.filename ?? file.name,
+        width: 'full',
+        mediaType: mimeToMediaType(file.type),
+      })
     } catch (err) {
       alert(err instanceof Error ? err.message : '업로드에 실패했습니다.')
     } finally {
@@ -82,15 +124,9 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
     }
   }, [block.id, slug, editToken, onUpdate])
 
-  // initialFile이 변경될 때마다 업로드 트리거
-  // (마운트 시 initialFile이 있을 때 + 외부 드롭으로 나중에 할당될 때 모두 처리)
+  // initialFile 변경 시 자동 업로드
   useEffect(() => {
-    if (
-      initialFile &&
-      !block.url &&
-      !uploadingRef.current &&
-      initialFile !== handledFileRef.current
-    ) {
+    if (initialFile && !block.url && !uploadingRef.current && initialFile !== handledFileRef.current) {
       handledFileRef.current = initialFile
       uploadFile(initialFile)
     }
@@ -102,28 +138,18 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
     if (arr.length === 0) return
     const [first, ...rest] = arr
     uploadFile(first)
-    if (rest.length > 0 && onAddFilesBelow) {
-      onAddFilesBelow(rest)
-    }
+    if (rest.length > 0 && onAddFilesBelow) onAddFilesBelow(rest)
   }, [uploadFile, onAddFilesBelow])
 
   /* ── 업로드 완료 상태 ── */
   if (block.url) {
     const displayName = getFilename(block.url, block.filename)
     const widthClass  = getWidthClass(block.width)
+    const kind        = detectMediaType(block.url, block.mediaType)
 
     /* ── PDF ── */
-    if (isPDF(block.url)) {
+    if (kind === 'pdf') {
       const w = block.width ?? 'full'
-      const pdfIcon = (
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-            <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-            <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
-        </div>
-      )
       return (
         <div
           className="group relative"
@@ -133,13 +159,17 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
           <div className={`${widthClass} relative transition-all duration-200`}>
             <a href={block.url} target="_blank" rel="noreferrer"
               className="flex items-center gap-3 rounded-lg border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-muted">
-              {pdfIcon}
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-red-500">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+              </div>
               {w !== 'small' && (
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-popup-text" title={displayName}>{displayName}</p>
-                  {w === 'full' && (
-                    <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>
-                  )}
+                  {w === 'full' && <p className="mt-0.5 text-xs text-popup-faint">PDF · 클릭해서 열기</p>}
                 </div>
               )}
               {w !== 'small' && (
@@ -158,6 +188,44 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
       )
     }
 
+    /* ── 영상 ── */
+    if (kind === 'video') {
+      return (
+        <div
+          className="group relative"
+          onMouseEnter={() => setShowSize(true)}
+          onMouseLeave={() => setShowSize(false)}
+        >
+          <div className={`${widthClass} relative transition-all duration-200`}>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              src={block.url}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full rounded-lg bg-black"
+              style={{ maxHeight: '80vh' }}
+            />
+            {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
+          </div>
+
+          <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
+            {/* 영상 아이콘 */}
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
+              <rect x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M10 9l5 3-5 3V9z" fill="currentColor" />
+            </svg>
+            <span className="max-w-[200px] truncate text-xs text-popup-faint" title={displayName}>{displayName}</span>
+          </div>
+
+          <button onClick={() => onDelete(block.id)}
+            className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+            삭제
+          </button>
+        </div>
+      )
+    }
+
     /* ── 이미지 ── */
     return (
       <div
@@ -166,11 +234,7 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
         onMouseLeave={() => setShowSize(false)}
       >
         <div className={`${widthClass} relative transition-all duration-200`}>
-          <img
-            src={block.url}
-            alt={displayName}
-            className="w-full rounded-lg object-cover"
-          />
+          <img src={block.url} alt={displayName} className="w-full rounded-lg object-cover" />
           {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
         </div>
 
@@ -202,7 +266,7 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,application/pdf"
+        accept="image/*,video/mp4,video/quicktime,video/webm,video/x-m4v,application/pdf"
         multiple
         className="hidden"
         onChange={(e) => { if (e.target.files && e.target.files.length > 0) handleFiles(e.target.files) }}
@@ -214,24 +278,38 @@ export default function ImageBlock({ block, slug, editToken, onUpdate, onDelete,
             {pendingName}
           </p>
           <div className="mx-auto mb-2 h-1.5 w-48 overflow-hidden rounded-full bg-popup-border">
-            <div className="h-full rounded-full bg-popup-accent transition-all duration-200" style={{ width: `${progress}%` }} />
+            <div
+              className="h-full rounded-full bg-popup-accent transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
           </div>
-          <p className="text-xs text-popup-faint">업로드 중... {progress}%</p>
+          <p className="text-xs text-popup-faint">{progress}%</p>
         </>
       ) : (
         <>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="mx-auto mb-3 opacity-30">
-            <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
-            <circle cx="8.5" cy="8.5" r="1.75" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M3 16l4.5-4 3.5 3 3-2 7 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <p className="text-sm text-popup-muted">이미지 / 문서 업로드</p>
-          <p className="mt-1 text-xs text-popup-faint">클릭하거나 여러 파일을 한 번에 드래그하세요</p>
+          {/* 이미지 + 영상 아이콘 */}
+          <div className="mx-auto mb-3 flex items-center justify-center gap-2 opacity-30">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="8.5" cy="8.5" r="1.75" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M3 16l4.5-4 3.5 3 3-2 7 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M10 9l5 3-5 3V9z" fill="currentColor" />
+            </svg>
+          </div>
+          <p className="text-sm text-popup-muted">이미지 · 영상 · 문서 업로드</p>
+          <p className="mt-1 text-xs text-popup-faint">
+            이미지/PDF 50MB · 영상 최대 1GB · 클릭하거나 드래그
+          </p>
         </>
       )}
 
-      <button onClick={(e) => { e.stopPropagation(); onDelete(block.id) }}
-        className="absolute right-2 top-2 rounded bg-black/30 px-2 py-0.5 text-xs text-white transition-opacity sm:bg-transparent sm:text-popup-muted sm:opacity-0 sm:group-hover:opacity-100">
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(block.id) }}
+        className="absolute right-2 top-2 rounded bg-black/30 px-2 py-0.5 text-xs text-white transition-opacity sm:bg-transparent sm:text-popup-muted sm:opacity-0 sm:group-hover:opacity-100"
+      >
         삭제
       </button>
     </div>

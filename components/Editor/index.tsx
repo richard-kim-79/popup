@@ -12,6 +12,7 @@ import type { Block, BlockType } from '@/types'
 
 const ACCEPTED_MIME = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
+  'video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v',
 ])
 
 const HISTORY_LIMIT = 50

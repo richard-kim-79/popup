@@ -29,6 +29,8 @@ const IMG_WIDTH: Record<ImageWidth, string> = {
   full:   'w-full',
 }
 
+const VIDEO_EXT = /\.(mp4|mov|webm|m4v)$/i
+
 const REPORT_HIDE_THRESHOLD = 3
 
 interface Props {
@@ -137,7 +139,9 @@ function renderBlock(block: Block) {
     case 'image': {
       if (!block.url) return null
       const displayName = block.filename ?? (() => { try { return decodeURIComponent(block.url!.split('/').pop()?.split('?')[0] ?? '파일') } catch { return '파일' } })()
-      if (block.url.toLowerCase().endsWith('.pdf')) {
+
+      // ── PDF ──
+      if (block.mediaType === 'pdf' || block.url.toLowerCase().endsWith('.pdf')) {
         const w = block.width ?? 'full'
         return (
           <div key={block.id} className={`mb-4 ${IMG_WIDTH[w]}`}>
@@ -165,12 +169,30 @@ function renderBlock(block: Block) {
           </div>
         )
       }
+
+      // ── 영상 ──
+      if (block.mediaType === 'video' || VIDEO_EXT.test(block.url)) {
+        return (
+          <div key={block.id} className={`mb-4 ${IMG_WIDTH[block.width ?? 'full']}`}>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              src={block.url}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full rounded-lg bg-black"
+              style={{ maxHeight: '80vh' }}
+            />
+          </div>
+        )
+      }
+
+      // ── 이미지 ──
       return (
         <div key={block.id} className="mb-4">
           <div className={IMG_WIDTH[block.width ?? 'full']}>
             <img src={block.url} alt={displayName} className="w-full rounded-lg object-cover" />
           </div>
-          {/* 파일명 비표시 — 깔끔한 뷰어 */}
         </div>
       )
     }

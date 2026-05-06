@@ -18,12 +18,15 @@ export interface TextBlock extends BaseBlock {
 
 export type ImageWidth = 'small' | 'medium' | 'full'
 
+export type MediaType = 'image' | 'video' | 'pdf'
+
 export interface ImageBlock extends BaseBlock {
   type: 'image'
   url?: string         // Supabase Storage public URL
   filename?: string    // 원본 파일명 (한글/영문 포함)
   width?: ImageWidth   // 크기 프리셋 (기본: 'full')
   caption?: string
+  mediaType?: MediaType  // 미디어 종류 (미설정 시 확장자로 판별)
 }
 
 export interface ButtonBlock extends BaseBlock {
