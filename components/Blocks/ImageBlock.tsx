@@ -14,6 +14,9 @@ interface Props {
   initialFile?: File
 }
 
+// Supabase 인증 헤더 — XHR 업로드에 필수
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+
 /** URL에서 파일명 추출 */
 function getFilename(url: string, fallback?: string): string {
   if (fallback) return fallback
@@ -21,7 +24,7 @@ function getFilename(url: string, fallback?: string): string {
   catch { return url.split('/').pop() ?? '파일' }
 }
 
-const PDF_EXT = /\.pdf$/i
+const PDF_EXT   = /\.pdf$/i
 const VIDEO_EXT = /\.(mp4|mov|webm|m4v)$/i
 
 const VIDEO_MIME = new Set([
@@ -30,18 +33,24 @@ const VIDEO_MIME = new Set([
 
 function detectMediaType(url: string, mediaType?: MediaType): MediaType {
   if (mediaType) return mediaType
-  if (PDF_EXT.test(url)) return 'pdf'
+  if (PDF_EXT.test(url))   return 'pdf'
   if (VIDEO_EXT.test(url)) return 'video'
   return 'image'
 }
 
 function mimeToMediaType(mime: string): MediaType {
   if (mime === 'application/pdf') return 'pdf'
-  if (VIDEO_MIME.has(mime)) return 'video'
+  if (VIDEO_MIME.has(mime))       return 'video'
   return 'image'
 }
 
-/** XHR 기반 업로드 (실시간 진행률) */
+/**
+ * XHR 업로드 — 실시간 진행률 (0-100%)
+ *
+ * Supabase 스토리지 signed URL 업로드는 Authorization + apikey 헤더가 필수.
+ * supabase.storage.uploadToSignedUrl() 은 내부에서 this.headers 로 자동 추가하지만
+ * 직접 XHR을 쓸 때는 명시적으로 넣어야 한다.
+ */
 function uploadViaXhr(
   signedUrl: string,
   file: File,
@@ -50,22 +59,43 @@ function uploadViaXhr(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', signedUrl)
-    xhr.setRequestHeader('Content-Type', file.type)
+
+    // Content-Type — 비어있으면 octet-stream으로 fallback (일부 Android)
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    // Supabase 스토리지 필수 헤더
+    xhr.setRequestHeader('x-upsert', 'false')
+    if (SUPABASE_ANON_KEY) {
+      xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_ANON_KEY}`)
+      xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY)
+    }
+
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
     }
+
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else reject(new Error(`업로드 실패 (${xhr.status})`))
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve()
+      } else {
+        // 실제 응답 본문을 에러에 포함해 원인 파악 용이하게
+        let detail = ''
+        try {
+          const parsed = JSON.parse(xhr.responseText) as { message?: string; error?: string }
+          detail = parsed.message ?? parsed.error ?? xhr.responseText.slice(0, 120)
+        } catch {
+          detail = xhr.responseText.slice(0, 120)
+        }
+        reject(new Error(`업로드 실패 (HTTP ${xhr.status})${detail ? ': ' + detail : ''}`))
+      }
     }
-    xhr.onerror = () => reject(new Error('네트워크 오류'))
+    xhr.onerror = () => reject(new Error('네트워크 오류. 연결 상태를 확인하세요.'))
     xhr.onabort = () => reject(new Error('업로드가 취소됐습니다.'))
     xhr.send(file)
   })
 }
 
 export default function ImageBlock({
-  block, slug, editToken, onUpdate, onDelete, onAddFilesBelow, initialFile
+  block, slug, editToken, onUpdate, onDelete, onAddFilesBelow, initialFile,
 }: Props) {
   const inputRef        = useRef<HTMLInputElement>(null)
   const [uploading, setUploading]     = useState(false)
@@ -88,11 +118,16 @@ export default function ImageBlock({
     setProgress(0)
 
     try {
-      // ① Signed URL 발급
+      // ① Signed URL 발급 (Vercel 경유 — 파일 본문은 여기로 안 보냄)
       const tokenRes = await fetch(`/api/pages/${slug}/upload`, {
         method: 'POST',
         headers: { 'x-edit-token': editToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, mimeType: file.type, size: file.size }),
+        body: JSON.stringify({
+          filename: file.name,
+          // 일부 기기에서 file.type이 빈 문자열일 수 있으므로 확장자로 보완
+          mimeType: file.type || guessMime(file.name),
+          size: file.size,
+        }),
       })
       const tokenData = await tokenRes.json() as {
         signedUrl?: string; token?: string; path?: string
@@ -104,15 +139,15 @@ export default function ImageBlock({
         return
       }
 
-      // ② XHR 업로드 (실시간 진행률)
+      // ② 파일을 브라우저에서 Supabase로 직접 PUT (Vercel 미경유)
       await uploadViaXhr(tokenData.signedUrl, file, setProgress)
 
-      // ③ 블록 업데이트 (mediaType 포함)
+      // ③ 블록 업데이트
       onUpdate(block.id, {
         url: tokenData.publicUrl,
         filename: tokenData.filename ?? file.name,
         width: 'full',
-        mediaType: mimeToMediaType(file.type),
+        mediaType: mimeToMediaType(file.type || guessMime(file.name)),
       })
     } catch (err) {
       alert(err instanceof Error ? err.message : '업로드에 실패했습니다.')
@@ -126,7 +161,12 @@ export default function ImageBlock({
 
   // initialFile 변경 시 자동 업로드
   useEffect(() => {
-    if (initialFile && !block.url && !uploadingRef.current && initialFile !== handledFileRef.current) {
+    if (
+      initialFile &&
+      !block.url &&
+      !uploadingRef.current &&
+      initialFile !== handledFileRef.current
+    ) {
       handledFileRef.current = initialFile
       uploadFile(initialFile)
     }
@@ -208,16 +248,13 @@ export default function ImageBlock({
             />
             {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
           </div>
-
           <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
-            {/* 영상 아이콘 */}
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
               <rect x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" strokeWidth="1.5" />
               <path d="M10 9l5 3-5 3V9z" fill="currentColor" />
             </svg>
             <span className="max-w-[200px] truncate text-xs text-popup-faint" title={displayName}>{displayName}</span>
           </div>
-
           <button onClick={() => onDelete(block.id)}
             className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
             삭제
@@ -237,7 +274,6 @@ export default function ImageBlock({
           <img src={block.url} alt={displayName} className="w-full rounded-lg object-cover" />
           {showSize && <SizeOverlay current={block.width} onChange={handleSizeChange} />}
         </div>
-
         <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="shrink-0 text-popup-faint">
             <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
@@ -246,7 +282,6 @@ export default function ImageBlock({
           </svg>
           <span className="max-w-[200px] truncate text-xs text-popup-faint" title={displayName}>{displayName}</span>
         </div>
-
         <button onClick={() => onDelete(block.id)}
           className="absolute right-2 top-2 rounded bg-black/50 px-2 py-0.5 text-xs text-white transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
           삭제
@@ -287,7 +322,6 @@ export default function ImageBlock({
         </>
       ) : (
         <>
-          {/* 이미지 + 영상 아이콘 */}
           <div className="mx-auto mb-3 flex items-center justify-center gap-2 opacity-30">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
@@ -314,4 +348,16 @@ export default function ImageBlock({
       </button>
     </div>
   )
+}
+
+/** 파일명 확장자로 MIME 추측 — file.type이 비어있을 때 사용 */
+function guessMime(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  const map: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+    gif: 'image/gif',  webp: 'image/webp', pdf: 'application/pdf',
+    mp4: 'video/mp4',  mov: 'video/quicktime',
+    webm: 'video/webm', m4v: 'video/x-m4v',
+  }
+  return map[ext] ?? 'application/octet-stream'
 }

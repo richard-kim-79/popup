@@ -22,25 +22,32 @@ const ALLOWED_MIME = new Set([...ALLOWED_IMAGE_MIME, ...ALLOWED_VIDEO_MIME])
 
 /** 이미지·PDF: 50MB, 영상: 1GB */
 const IMAGE_MAX_SIZE = parseInt(process.env.UPLOAD_MAX_SIZE ?? '') || 50 * 1024 * 1024
-const VIDEO_MAX_SIZE = parseInt(process.env.VIDEO_MAX_SIZE ?? '') || 1 * 1024 * 1024 * 1024
+const VIDEO_MAX_SIZE = parseInt(process.env.VIDEO_MAX_SIZE  ?? '') || 1 * 1024 * 1024 * 1024
 
 const BUCKET = 'media'
 
+// 버킷 초기화 여부 (프로세스 수명 동안 1회만 실행)
+let bucketReady = false
+
 async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {
+  if (bucketReady) return
+
   const { data: buckets } = await supabase.storage.listBuckets()
   const exists = buckets?.some((b) => b.name === BUCKET)
-  if (!exists) {
-    await supabase.storage.createBucket(BUCKET, {
-      public: true,
-      fileSizeLimit: VIDEO_MAX_SIZE,
-    })
-  } else {
-    // 기존 버킷의 파일 크기 제한을 1GB로 업데이트
-    await supabase.storage.updateBucket(BUCKET, {
-      public: true,
-      fileSizeLimit: VIDEO_MAX_SIZE,
-    })
+
+  const bucketOptions = {
+    public: true,
+    fileSizeLimit: VIDEO_MAX_SIZE,                      // 1GB (Supabase Pro 이상 적용)
+    allowedMimeTypes: [...ALLOWED_MIME],                // 허용 MIME 명시
   }
+
+  if (!exists) {
+    const { error } = await supabase.storage.createBucket(BUCKET, bucketOptions)
+    if (error) throw new Error(`버킷 생성 실패: ${error.message}`)
+  }
+  // 기존 버킷은 건드리지 않음 — 매 요청마다 updateBucket 호출하지 않는다
+
+  bucketReady = true
 }
 
 interface SignedUploadRequest {
@@ -80,21 +87,32 @@ export async function POST(
   const { filename, mimeType, size } = body
 
   if (!ALLOWED_MIME.has(mimeType)) {
-    return NextResponse.json({ error: '지원하지 않는 파일 형식입니다. (이미지·PDF·영상만 가능)' }, { status: 400 })
+    return NextResponse.json(
+      { error: `지원하지 않는 형식입니다: ${mimeType}\n(지원: 이미지·PDF·mp4·mov·webm)` },
+      { status: 400 }
+    )
   }
 
-  const isVideo = ALLOWED_VIDEO_MIME.has(mimeType)
-  const maxSize = isVideo ? VIDEO_MAX_SIZE : IMAGE_MAX_SIZE
-  const limitLabel = isVideo ? '1GB' : `${Math.round(IMAGE_MAX_SIZE / 1024 / 1024)}MB`
+  const isVideo  = ALLOWED_VIDEO_MIME.has(mimeType)
+  const maxSize  = isVideo ? VIDEO_MAX_SIZE : IMAGE_MAX_SIZE
+  const limitMB  = isVideo ? '1,024MB (1GB)' : `${Math.round(IMAGE_MAX_SIZE / 1024 / 1024)}MB`
 
   if (size > maxSize) {
-    return NextResponse.json({ error: `파일 크기는 ${limitLabel} 이하여야 합니다.` }, { status: 400 })
+    return NextResponse.json(
+      { error: `파일 크기 초과: ${limitMB} 이하여야 합니다.\n(실제: ${Math.round(size / 1024 / 1024)}MB)` },
+      { status: 400 }
+    )
   }
 
   const supabase = getSupabaseAdmin()
-  await ensureBucket(supabase)
 
-  const ext = filename.split('.').pop() ?? 'bin'
+  try {
+    await ensureBucket(supabase)
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+  }
+
+  const ext  = filename.split('.').pop()?.toLowerCase() ?? 'bin'
   const path = `${slug}/${Date.now()}.${ext}`
 
   const { data, error } = await supabase.storage
@@ -102,17 +120,20 @@ export async function POST(
     .createSignedUploadUrl(path)
 
   if (error || !data) {
-    return NextResponse.json({ error: `서명 URL 발급 실패: ${error?.message}` }, { status: 500 })
+    return NextResponse.json(
+      { error: `서명 URL 발급 실패: ${error?.message ?? '알 수 없는 오류'}` },
+      { status: 500 }
+    )
   }
 
   const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
 
   return NextResponse.json({
     signedUrl: data.signedUrl,
-    token: data.token,
-    path: data.path,
+    token:     data.token,
+    path:      data.path,
     publicUrl,
     filename,
     isVideo,
-  }, { status: 200 })
+  })
 }
