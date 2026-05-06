@@ -20,9 +20,9 @@ const ALLOWED_VIDEO_MIME = new Set([
 
 const ALLOWED_MIME = new Set([...ALLOWED_IMAGE_MIME, ...ALLOWED_VIDEO_MIME])
 
-/** 이미지·PDF: 50MB, 영상: 1GB */
+/** 이미지·PDF·영상 모두 50MB */
 const IMAGE_MAX_SIZE = parseInt(process.env.UPLOAD_MAX_SIZE ?? '') || 50 * 1024 * 1024
-const VIDEO_MAX_SIZE = parseInt(process.env.VIDEO_MAX_SIZE  ?? '') || 1 * 1024 * 1024 * 1024
+const VIDEO_MAX_SIZE = IMAGE_MAX_SIZE
 
 const BUCKET = 'media'
 
@@ -37,7 +37,7 @@ async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {
 
   const bucketOptions = {
     public: true,
-    fileSizeLimit: VIDEO_MAX_SIZE,                      // 1GB (Supabase Pro 이상 적용)
+    fileSizeLimit: IMAGE_MAX_SIZE,                      // 50MB
     allowedMimeTypes: [...ALLOWED_MIME],                // 허용 MIME 명시
   }
 
@@ -95,7 +95,7 @@ export async function POST(
 
   const isVideo  = ALLOWED_VIDEO_MIME.has(mimeType)
   const maxSize  = isVideo ? VIDEO_MAX_SIZE : IMAGE_MAX_SIZE
-  const limitMB  = isVideo ? '1,024MB (1GB)' : `${Math.round(IMAGE_MAX_SIZE / 1024 / 1024)}MB`
+  const limitMB  = `${Math.round(maxSize / 1024 / 1024)}MB`
 
   if (size > maxSize) {
     return NextResponse.json(

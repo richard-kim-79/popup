@@ -335,7 +335,7 @@ export default function ImageBlock({
           </div>
           <p className="text-sm text-popup-muted">이미지 · 영상 · 문서 업로드</p>
           <p className="mt-1 text-xs text-popup-faint">
-            이미지/PDF 50MB · 영상 최대 1GB · 클릭하거나 드래그
+            이미지 · 영상 · PDF · 최대 50MB · 클릭하거나 드래그
           </p>
         </>
       )}
