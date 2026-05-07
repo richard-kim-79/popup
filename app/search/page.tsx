@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import type { SearchResult } from '@/app/api/search/route'
+import type { Block, PageResponse } from '@/types'
 
 const BASE = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com'
 
@@ -18,6 +19,16 @@ function extractSlug(input: string): string {
     // plain slug
   }
   return trimmed.replace(/^\//, '')
+}
+
+/** 블록 배열에서 첫 번째 텍스트 콘텐츠 추출 (h1 우선 → h2 → text) */
+function extractTitleFromBlocks(blocks: Block[]): string {
+  const priority = ['h1', 'h2', 'text'] as const
+  for (const type of priority) {
+    const block = blocks.find((b) => b.type === type) as { content?: string } | undefined
+    if (block?.content?.trim()) return block.content.trim().slice(0, 80)
+  }
+  return ''
 }
 
 /** 날짜 포맷: "2026. 4. 28." */
@@ -40,6 +51,11 @@ export default function SearchPage() {
   const [regLoading, setRegLoading] = useState(false)
   const [regError, setRegError] = useState('')
   const [regSuccess, setRegSuccess] = useState(false)
+
+  // 제목 자동채움 상태
+  const [titleFetching, setTitleFetching] = useState(false)   // URL → 제목 로딩 중
+  const [titleAutoFilled, setTitleAutoFilled] = useState(false) // 자동채움 여부
+  const titleFetchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -73,6 +89,43 @@ export default function SearchPage() {
     }
   }, [query, fetchResults, initialLoaded])
 
+  // URL 입력 → 페이지 제목 자동 추출
+  useEffect(() => {
+    if (titleFetchRef.current) clearTimeout(titleFetchRef.current)
+
+    const slug = extractSlug(regUrl)
+    if (!slug) {
+      // URL 지워졌을 때 자동채움된 제목도 초기화
+      if (titleAutoFilled) { setRegTitle(''); setTitleAutoFilled(false) }
+      return
+    }
+
+    titleFetchRef.current = setTimeout(async () => {
+      setTitleFetching(true)
+      try {
+        const res = await fetch(`/api/pages/${encodeURIComponent(slug)}`)
+        if (!res.ok) return
+        const json = await res.json() as PageResponse
+        const extracted = extractTitleFromBlocks(json.blocks ?? [])
+        if (extracted) {
+          // 사용자가 직접 수정하지 않은 경우에만 자동채움
+          setRegTitle((prev) => (titleAutoFilled || prev === '') ? extracted : prev)
+          setTitleAutoFilled(true)
+        }
+      } catch {
+        // 무시
+      } finally {
+        setTitleFetching(false)
+      }
+    }, 600)
+
+    return () => {
+      if (titleFetchRef.current) clearTimeout(titleFetchRef.current)
+    }
+  // titleAutoFilled는 의존성에서 제외 — setTitleAutoFilled로만 변경됨
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regUrl])
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setRegError('')
@@ -100,6 +153,7 @@ export default function SearchPage() {
       } else {
         setRegSuccess(true)
         setRegUrl(''); setRegPin(''); setRegTitle(''); setRegDesc('')
+        setTitleAutoFilled(false)
         // 결과 새로고침
         fetchResults(query)
       }
@@ -252,12 +306,24 @@ export default function SearchPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-popup-text">제목 <span className="text-red-400">*</span></label>
+                    <div className="mb-1 flex items-center gap-2">
+                      <label className="text-xs font-medium text-popup-text">제목 <span className="text-red-400">*</span></label>
+                      {titleFetching && (
+                        <span className="text-[10px] text-popup-muted">페이지에서 불러오는 중…</span>
+                      )}
+                      {!titleFetching && titleAutoFilled && regTitle && (
+                        <span className="rounded bg-popup-accent-bg px-1.5 py-0.5 text-[10px] font-medium text-popup-accent">자동완성</span>
+                      )}
+                    </div>
                     <input
                       type="text"
-                      placeholder="검색 결과에 표시될 제목"
+                      placeholder={titleFetching ? '제목을 불러오는 중…' : '검색 결과에 표시될 제목'}
                       value={regTitle}
-                      onChange={(e) => setRegTitle(e.target.value)}
+                      onChange={(e) => {
+                        setRegTitle(e.target.value)
+                        // 사용자가 직접 수정하면 자동채움 해제
+                        setTitleAutoFilled(false)
+                      }}
                       maxLength={80}
                       className="w-full rounded-lg border border-popup-border bg-popup-bg px-3 py-2 text-sm text-popup-text outline-none focus:border-popup-accent"
                     />
