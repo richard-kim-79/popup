@@ -12,67 +12,31 @@ export default function AppleIcon() {
         style={{
           width: 180,
           height: 180,
-          background: 'linear-gradient(150deg, #3d8065 0%, #1a3d2b 100%)',
+          background: '#2A6049',
           display: 'flex',
           position: 'relative',
-          overflow: 'hidden',
         }}
       >
-        {/* 좌상단 하이라이트 */}
+        {/* 뒤 카드 */}
         <div
           style={{
             position: 'absolute',
-            top: 0, left: 0, right: 0, height: 90,
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 100%)',
+            left: 28, top: 76,
+            width: 76, height: 76,
+            borderRadius: 19,
+            background: 'rgba(255,255,255,0.28)',
           }}
         />
-
-        {/* 카드 3 — 가장 뒤 */}
+        {/* 앞 팝업 카드 */}
         <div
           style={{
             position: 'absolute',
-            left: 20, top: 72,
-            width: 88, height: 88,
-            borderRadius: 18,
-            background: 'rgba(255,255,255,0.16)',
-            border: '1.5px solid rgba(255,255,255,0.10)',
-          }}
-        />
-
-        {/* 카드 2 — 중간 */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 46, top: 46,
-            width: 88, height: 88,
-            borderRadius: 18,
-            background: 'rgba(255,255,255,0.34)',
-            border: '1.5px solid rgba(255,255,255,0.18)',
-          }}
-        />
-
-        {/* 카드 1 — 앞 (팝업) */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 72, top: 20,
-            width: 88, height: 88,
-            borderRadius: 18,
+            left: 76, top: 28,
+            width: 76, height: 76,
+            borderRadius: 19,
             background: 'white',
-            boxShadow: '0 8px 28px rgba(0,0,0,0.28)',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: '14px 12px',
-            gap: 7,
           }}
-        >
-          {/* 제목 바 */}
-          <div style={{ width: '65%', height: 8, background: '#2A6049', borderRadius: 3, opacity: 0.9 }} />
-          {/* 콘텐츠 라인 */}
-          <div style={{ width: '90%', height: 5, background: '#DDDBD6', borderRadius: 3 }} />
-          <div style={{ width: '80%', height: 5, background: '#DDDBD6', borderRadius: 3 }} />
-          <div style={{ width: '55%', height: 5, background: '#DDDBD6', borderRadius: 3 }} />
-        </div>
+        />
       </div>
     ),
     { width: 180, height: 180 }
