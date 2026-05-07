@@ -11,6 +11,8 @@ import {
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
+  type DraggableAttributes,
+  type DraggableSyntheticListeners,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -77,11 +79,20 @@ function BlockDragCard({ block }: { block: Block }) {
   )
 }
 
-/* ── 드래그 핸들 (시각적 표시만 — 리스너는 외부 래퍼에 있음) ── */
-function DragHandle() {
+/* ── 드래그 핸들 (리스너를 핸들에만 적용 → 텍스트 선택 충돌 방지) ── */
+function DragHandle({
+  listeners,
+  attributes,
+}: {
+  listeners?: DraggableSyntheticListeners
+  attributes?: DraggableAttributes
+}) {
   return (
     <div
-      aria-hidden="true"
+      {...listeners}
+      {...attributes}
+      aria-label="블록 이동"
+      title="드래그해서 순서 변경"
       className="mt-0.5 flex h-10 w-7 shrink-0 cursor-grab items-center justify-center rounded-lg text-popup-faint transition-colors duration-200 active:cursor-grabbing sm:h-8 sm:w-5 sm:opacity-0 sm:group-hover:opacity-60"
     >
       <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
@@ -112,7 +123,7 @@ function SortableBlock({
   initialFile?: File
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id })
-  // listeners/attributes를 외부 래퍼에 적용 → 모바일에서 블록 전체 영역 길게 눌러서 이동 가능
+  // listeners/attributes를 DragHandle에만 적용 → 텍스트 블록 내 드래그 선택과 충돌 없음
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -198,10 +209,9 @@ function SortableBlock({
       ref={setNodeRef}
       style={style}
       className="group flex items-start gap-1.5"
-      {...listeners}
-      {...attributes}
     >
-      <DragHandle />
+      {/* 핸들에만 listeners/attributes → 텍스트 선택과 충돌 없음 */}
+      <DragHandle listeners={listeners} attributes={attributes} />
       {/* 드래그 중: 점선 ghost placeholder */}
       {isDragging ? (
         <div className="min-h-[40px] flex-1 rounded-lg border-2 border-dashed border-popup-accent/40 bg-popup-accent-bg/30" />
@@ -219,8 +229,10 @@ export default function BlockList({
   const [activeId, setActiveId] = useState<string | null>(null)
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    // distance: 8 → 핸들에서 살짝 움직여도 드래그 시작, 오탭 클릭 방지
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    // 모바일 길게 누르기 200ms → 드래그 시작
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
   )
 
   const handleDragStart = (event: DragStartEvent) => {
