@@ -9,7 +9,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
   const offset = (page - 1) * PAGE_SIZE
 
-  const q = (searchParams.get('q') ?? '').trim()
+  const rawQ = (searchParams.get('q') ?? '').trim()
+  // URL 형태(https://popup2026.com/IoGBnx)가 입력되면 마지막 path segment만 추출
+  const q = (() => {
+    if (!rawQ) return ''
+    try {
+      const url = new URL(rawQ.startsWith('http') ? rawQ : `https://${rawQ}`)
+      const segments = url.pathname.split('/').filter(Boolean)
+      return segments.at(-1) ?? rawQ
+    } catch {
+      return rawQ
+    }
+  })()
 
   const supabase = getSupabaseAdmin()
   let query = supabase
