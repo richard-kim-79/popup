@@ -9,6 +9,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
   const offset = (page - 1) * PAGE_SIZE
 
+  const q = (searchParams.get('q') ?? '').trim()
+
   const supabase = getSupabaseAdmin()
   let query = supabase
     .from('pages')
@@ -17,6 +19,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (filter === 'locked')   query = query.eq('locked', true).is('deleted_at', null)
   if (filter === 'reported') query = query.gt('report_count', 0).is('deleted_at', null)
   if (filter === 'deleted')  query = query.not('deleted_at', 'is', null)
+  if (q)                     query = query.ilike('slug', `%${q}%`)
 
   const { data, count } = await query
     .order('created_at', { ascending: false })

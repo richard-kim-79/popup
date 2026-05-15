@@ -27,17 +27,21 @@ export default function AdminPagesPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
 
   const fetchPages = useCallback(() => {
     setLoading(true)
-    fetch(`/api/admin/pages?filter=${filter}&page=${page}`)
+    const params = new URLSearchParams({ filter, page: String(page) })
+    if (search) params.set('q', search)
+    fetch(`/api/admin/pages?${params}`)
       .then((r) => r.json())
       .then((d: { data: PageRow[]; total: number }) => {
         setRows(d.data)
         setTotal(d.total)
       })
       .finally(() => setLoading(false))
-  }, [filter, page])
+  }, [filter, page, search])
 
   useEffect(() => { fetchPages() }, [fetchPages])
 
@@ -56,8 +60,46 @@ export default function AdminPagesPage() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-bold text-popup-text">페이지 관리</h1>
-        <span className="text-sm text-popup-muted">총 {total}개</span>
+        <span className="text-sm text-popup-muted">
+          {search ? `"${search}" 검색 결과 ${total}개` : `총 ${total}개`}
+        </span>
       </div>
+
+      {/* 검색창 */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); setSearch(searchInput); setPage(1) }}
+        className="mb-4 flex gap-2"
+      >
+        <div className="relative flex-1">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-popup-faint">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8"/>
+            <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
+          <input
+            type="text"
+            placeholder="슬러그 또는 링크 주소로 검색"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full rounded-lg border border-popup-border bg-popup-bg py-2 pl-8 pr-3 text-sm text-popup-text outline-none focus:border-popup-accent"
+          />
+        </div>
+        <button
+          type="submit"
+          className="rounded-lg bg-popup-accent px-4 py-2 text-sm font-medium text-white hover:bg-popup-accent-hover"
+        >
+          검색
+        </button>
+        {search && (
+          <button
+            type="button"
+            onClick={() => { setSearchInput(''); setSearch(''); setPage(1) }}
+            className="rounded-lg border border-popup-border px-3 py-2 text-sm text-popup-muted hover:bg-popup-bg"
+          >
+            초기화
+          </button>
+        )}
+      </form>
 
       {/* 필터 탭 */}
       <div className="mb-4 flex gap-1">
