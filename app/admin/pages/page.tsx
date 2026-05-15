@@ -166,9 +166,12 @@ export default function AdminPagesPage() {
                         className="text-xs text-popup-accent hover:underline">복원</button>
                     ) : (
                       <>
-                        {row.locked && (
+                        {/* locked이거나 만료된 페이지 모두 활성화 버튼 표시 */}
+                        {(row.locked || (row.expires_at && new Date(row.expires_at) < new Date())) && (
                           <button onClick={() => action(row.slug, 'unlock')}
-                            className="text-xs text-popup-accent hover:underline">잠금해제</button>
+                            className="rounded bg-popup-accent-bg px-2 py-0.5 text-xs font-medium text-popup-accent hover:bg-popup-accent hover:text-white transition-colors">
+                            활성화
+                          </button>
                         )}
                         <button onClick={() => action(row.slug, 'delete')}
                           className="text-xs text-red-500 hover:underline">삭제</button>
