@@ -44,13 +44,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const { data } = await supabase
     .from('pages')
-    .select('blocks, locked')
+    .select('blocks, locked, expires_at')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
 
   const blocks = ((data?.blocks ?? []) as unknown) as Block[]
-  const isLocked = data?.locked ?? false
+  const isLocked = (data?.locked ?? false) || (data?.expires_at ? new Date(data.expires_at) < new Date() : false)
 
   // 첫 번째 H1을 제목으로
   const titleBlock = blocks.find((b) => b.type === 'h1' && (b as { content?: string }).content?.trim())
@@ -312,6 +312,8 @@ export default async function ViewerPage({ params }: Props) {
   const isHidden = (data.report_count ?? 0) >= REPORT_HIDE_THRESHOLD
   const blocks = (data.blocks as unknown) as Block[]
   const remaining = daysLeft(data.expires_at)
+  // DB locked 또는 expires_at 경과 시 잠금 처리 (크론 미실행 방어)
+  const isLocked = data.locked || new Date(data.expires_at) < new Date()
 
   // JSON-LD 구조화 데이터
   const titleBlock = blocks.find((b) => b.type === 'h1' && (b as { content?: string }).content?.trim())
@@ -350,13 +352,13 @@ export default async function ViewerPage({ params }: Props) {
         <Link href="/" className="text-sm font-bold text-popup-text">
           Popup
         </Link>
-        {data.locked && (
+        {isLocked && (
           <span className="rounded bg-popup-warn-bg px-2 py-0.5 text-xs text-popup-warn">🔒 잠금됨</span>
         )}
       </nav>
 
       {/* Locked banner */}
-      {data.locked && <LockedBanner slug={slug} />}
+      {isLocked && <LockedBanner slug={slug} />}
 
       {/* Content */}
       <div className="mx-auto max-w-[700px] px-6 py-14">
@@ -364,6 +366,18 @@ export default async function ViewerPage({ params }: Props) {
           <div className="py-20 text-center">
             <p className="mb-2 text-lg font-semibold text-popup-text">이 페이지는 숨김 처리되었습니다</p>
             <p className="text-sm text-popup-muted">커뮤니티 신고로 인해 콘텐츠가 제한되었습니다.</p>
+          </div>
+        ) : isLocked ? (
+          <div className="py-20 text-center">
+            <div className="mb-4 text-4xl">🔒</div>
+            <p className="mb-2 text-lg font-semibold text-popup-text">페이지 사용 기간이 만료되었습니다</p>
+            <p className="mb-6 text-sm text-popup-muted">30일 무료 기간이 종료되어 콘텐츠가 잠겼습니다.</p>
+            <a
+              href={`/${slug}/edit`}
+              className="inline-block rounded-lg bg-popup-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-popup-accent-hover"
+            >
+              잠금 해제하기
+            </a>
           </div>
         ) : (
           blocks.map(renderBlock)
