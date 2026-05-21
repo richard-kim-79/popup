@@ -48,18 +48,22 @@ function buildServer(): McpServer {
     { name: 'popup', version: '1.0.0' },
     {
       instructions: `
-Popup은 로그인 없이 30초 만에 웹페이지를 만들고 링크로 공유하는 서비스입니다.
-당신은 사용자가 원하는 내용으로 페이지를 만들고, 수정하고, 공유할 수 있습니다.
+Popup creates instant shareable web pages — no login required.
 
-## 페이지 생성 가이드
-- 제목(h1/h2), 내용(text), 이미지(image), 버튼(button), 유튜브(youtube), 링크(link), 구분선(divider) 블록을 조합합니다.
-- 페이지 생성 시 반환되는 PIN을 사용자에게 반드시 알려주세요 (편집 시 필요).
-- 생성된 URL(popup2026.com/슬러그)을 공유하면 누구나 볼 수 있습니다.
+## ⚠️ MANDATORY RULE — ALWAYS FOLLOW BEFORE create_page
+Before calling create_page, you MUST ask the user to choose their own edit PIN.
+Say exactly: "편집 비밀번호(PIN)를 4자리 이상으로 직접 정해주세요. 나중에 이 번호로 수정할 수 있어요."
+Wait for the user's reply. Use ONLY the PIN the user provides.
+NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
 
-## 사용 예시
-- "내 카페 소개 페이지 만들어줘" → h1+text+image+button 조합
-- "행사 초대장 만들어줘" → h1+text+button(RSVP 링크)
-- "링크 모음 페이지 만들어줘" → h1+link 블록 여러 개
+## Page building guide
+Combine blocks: h1/h2 (headings), text (body), image (url), button (label+href),
+youtube (videoId), link (url+title), divider.
+
+## Examples
+- "카페 소개 페이지" → h1 + text + image + button
+- "행사 초대장" → h1 + text + button(RSVP)
+- "링크 모음" → h1 + multiple link blocks
       `.trim(),
     },
   )
@@ -69,7 +73,7 @@ Popup은 로그인 없이 30초 만에 웹페이지를 만들고 링크로 공�
   // ── Tool: create_page ────────────────────────────────────────
   server.tool(
     'create_page',
-    '새 Popup 페이지를 생성합니다. 블록 배열로 콘텐츠를 구성하면 즉시 공개 URL이 발급됩니다. 반환된 PIN을 사용자에게 알려주세요.',
+    'Creates a new Popup page. IMPORTANT: Do NOT call this tool until the user has explicitly told you their PIN. Ask first: "편집 비밀번호(PIN)를 4자리 이상으로 정해주세요."',
     {
       blocks: z.array(BlockSchema).describe('페이지를 구성할 블록 배열'),
       pin: z.string().min(4).max(8).describe('사용자가 직접 정한 4~8자리 편집 PIN. 반드시 사용자에게 먼저 물어보고 입력받으세요.'),
