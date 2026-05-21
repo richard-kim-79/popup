@@ -18,11 +18,11 @@ export function registerCreatePage(server: McpServer) {
         title: z.string().optional().describe('Link title (for link)'),
         description: z.string().optional().describe('Link description (for link)'),
       })).describe('Array of content blocks'),
-      pin: z.string().min(4).max(8).optional().describe('4–8 digit edit PIN (auto-generated if omitted)'),
+      pin: z.string().min(4).max(8).describe('4–8 digit edit PIN chosen by the user. ALWAYS ask the user what PIN they want before calling this tool.'),
     },
     { readOnlyHint: false, destructiveHint: false },
     async ({ blocks, pin }) => {
-      const result = await createPage(blocks, pin)
+      const result = await createPage(blocks, pin as string)
       if (!result.ok) {
         return {
           content: [{ type: 'text' as const, text: `Error: ${result.error?.message ?? 'Unknown error'}` }],
