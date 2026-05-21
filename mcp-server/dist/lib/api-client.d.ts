@@ -11,6 +11,9 @@ interface ApiResponse<T> {
 export interface PageData {
     slug: string;
     url: string;
+    editUrl?: string;
+    pin?: string;
+    editToken?: string;
     blocks: unknown[];
     locked: boolean;
     expiresAt: string;
@@ -25,7 +28,7 @@ export interface PagesListData {
     page: number;
     pageSize: number;
 }
-export declare function createPage(blocks: unknown[]): Promise<ApiResponse<PageData>>;
+export declare function createPage(blocks: unknown[], pin?: string): Promise<ApiResponse<PageData>>;
 export declare function listPages(page?: number, pageSize?: number): Promise<ApiResponse<PagesListData>>;
 export declare function getPage(slug: string): Promise<ApiResponse<PageData>>;
 export declare function deletePage(slug: string): Promise<ApiResponse<{

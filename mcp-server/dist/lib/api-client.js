@@ -24,8 +24,8 @@ async function request(method, path, body) {
     }
     return { ok: true, status: res.status, data: json };
 }
-export function createPage(blocks) {
-    return request('POST', '/api/v1/pages', { blocks });
+export function createPage(blocks, pin) {
+    return request('POST', '/api/v1/pages', { blocks, ...(pin ? { pin } : {}) });
 }
 export function listPages(page = 1, pageSize = 20) {
     return request('GET', `/api/v1/pages?page=${page}&pageSize=${pageSize}`);

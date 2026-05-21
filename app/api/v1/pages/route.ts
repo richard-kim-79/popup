@@ -8,6 +8,8 @@ import { authenticateApiKey, isApiError, apiError } from '@/lib/api-key-middlewa
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { generateUniqueSlug } from '@/lib/slug'
 import { validateBlocks, assignBlockIds } from '@/lib/validate-blocks'
+import { hashPin } from '@/lib/pin'
+import { issueEditToken } from '@/lib/token'
 import type { Block, Json } from '@/types'
 
 const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com').trim()
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
   const auth = await authenticateApiKey(req, 'pages:create')
   if (isApiError(auth)) return withCors(auth)
 
-  const body = await req.json().catch(() => null) as { blocks?: unknown; title?: string } | null
+  const body = await req.json().catch(() => null) as { blocks?: unknown; title?: string; pin?: string } | null
   if (!body?.blocks) {
     return withCors(apiError('INVALID_INPUT', 'blocks array is required', 400))
   }
@@ -38,15 +40,21 @@ export async function POST(req: NextRequest) {
   const expiresAt = new Date(now.getTime() + DEFAULT_DAYS * 24 * 60 * 60 * 1000).toISOString()
   const deleteAt = new Date(now.getTime() + (DEFAULT_DAYS + 7) * 24 * 60 * 60 * 1000).toISOString()
 
+  // PIN: 호출자가 전달하면 사용, 없으면 4자리 자동 생성
+  const pin = (typeof body.pin === 'string' && body.pin.length >= 4)
+    ? body.pin
+    : Math.floor(1000 + Math.random() * 9000).toString()
+  const pin_hash = await hashPin(pin)
+  const editToken = issueEditToken(slug)
+
   const supabase = getSupabaseAdmin()
 
-  // API 키로 생성한 페이지는 PIN 불필요 — 더미 해시 사용
   const { data: page, error } = await supabase
     .from('pages')
     .insert({
       slug,
       blocks: blocks as unknown as Json,
-      pin_hash: '__api_key__',  // API 키 생성 페이지 표식
+      pin_hash,
       expires_at: expiresAt,
       delete_at: deleteAt,
       api_key_id: auth.id,
@@ -68,6 +76,9 @@ export async function POST(req: NextRequest) {
     NextResponse.json({
       slug: page.slug,
       url: `${BASE_URL}/${page.slug}`,
+      editUrl: `${BASE_URL}/${page.slug}/edit`,
+      pin,           // 생성 시 1회 반환 — 클라이언트가 반드시 저장해야 함
+      editToken,
       blocks,
       createdAt: page.created_at,
       expiresAt: page.expires_at,

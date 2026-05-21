@@ -47,6 +47,9 @@ async function request<T>(
 export interface PageData {
   slug: string
   url: string
+  editUrl?: string
+  pin?: string       // 생성 시 1회만 반환
+  editToken?: string
   blocks: unknown[]
   locked: boolean
   expiresAt: string
@@ -63,8 +66,8 @@ export interface PagesListData {
   pageSize: number
 }
 
-export function createPage(blocks: unknown[]) {
-  return request<PageData>('POST', '/api/v1/pages', { blocks })
+export function createPage(blocks: unknown[], pin?: string) {
+  return request<PageData>('POST', '/api/v1/pages', { blocks, ...(pin ? { pin } : {}) })
 }
 
 export function listPages(page = 1, pageSize = 20) {
