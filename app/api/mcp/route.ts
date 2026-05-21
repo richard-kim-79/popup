@@ -70,11 +70,14 @@ Popup은 로그인 없이 30초 만에 웹페이지를 만들고 링크로 공�
   server.tool(
     'create_page',
     '새 Popup 페이지를 생성합니다. 블록 배열로 콘텐츠를 구성하면 즉시 공개 URL이 발급됩니다. 반환된 PIN을 사용자에게 알려주세요.',
-    { blocks: z.array(BlockSchema).describe('페이지를 구성할 블록 배열') },
+    {
+      blocks: z.array(BlockSchema).describe('페이지를 구성할 블록 배열'),
+      pin: z.string().min(4).max(8).optional().describe('4~8자리 편집 PIN (미입력 시 자동 생성)'),
+    },
     { readOnlyHint: false, destructiveHint: false },
-    async ({ blocks }) => {
+    async ({ blocks, pin: userPin }) => {
       const slug = await generateUniqueSlug()
-      const pin = Math.floor(1000 + Math.random() * 9000).toString() // 4자리 랜덤 PIN
+      const pin = userPin ?? Math.floor(1000 + Math.random() * 9000).toString()
       const { hashPin } = await import('@/lib/pin')
       const pin_hash = await hashPin(pin)
       const expires_at = new Date(Date.now() + DEFAULT_DAYS * 86400000).toISOString()
