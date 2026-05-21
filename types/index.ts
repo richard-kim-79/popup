@@ -69,6 +69,7 @@ export interface Page {
   id: string
   slug: string
   blocks: Block[]
+  html_content: string | null  // raw HTML 페이지 (null이면 블록 페이지)
   locked: boolean
   expires_at: string   // ISO 8601
   delete_at: string
@@ -120,6 +121,7 @@ export interface CreatePageResponse {
 
 export interface PageResponse {
   blocks: Block[]
+  htmlContent?: string | null  // raw HTML 페이지인 경우
   locked: boolean
   expiresAt: string
   viewCount: number
@@ -191,11 +193,13 @@ export type Database = {
           listing_description: string | null
           listed_at: string | null
           search_vector: string | null
+          html_content: string | null
         }
         Insert: {
           id?: string
           slug: string
           blocks?: Json
+          html_content?: string | null
           pin_hash: string
           expires_at: string
           delete_at: string
@@ -217,6 +221,7 @@ export type Database = {
           id?: string
           slug?: string
           blocks?: Json
+          html_content?: string | null
           pin_hash?: string
           expires_at?: string
           delete_at?: string

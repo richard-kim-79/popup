@@ -44,13 +44,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const { data } = await supabase
     .from('pages')
-    .select('blocks, locked, expires_at')
+    .select('blocks, locked, expires_at, html_content')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
 
-  const blocks = ((data?.blocks ?? []) as unknown) as Block[]
   const isLocked = (data?.locked ?? false) || (data?.expires_at ? new Date(data.expires_at) < new Date() : false)
+
+  // HTML 페이지는 블록 없음 — 기본 메타 사용
+  if (data?.html_content) {
+    return {
+      title: 'HTML 페이지 | Popup',
+      description: '30초 만에 웹페이지를 만들고 링크로 공유하세요',
+      robots: isLocked ? { index: false, follow: false } : { index: true, follow: true },
+    }
+  }
+
+  const blocks = ((data?.blocks ?? []) as unknown) as Block[]
 
   // 첫 번째 H1을 제목으로
   const titleBlock = blocks.find((b) => b.type === 'h1' && (b as { content?: string }).content?.trim())
@@ -302,7 +312,7 @@ export default async function ViewerPage({ params }: Props) {
 
   const { data, error } = await supabase
     .from('pages')
-    .select('blocks, locked, expires_at, deleted_at, report_count, created_at, updated_at')
+    .select('blocks, locked, expires_at, deleted_at, report_count, created_at, updated_at, html_content')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
@@ -314,6 +324,33 @@ export default async function ViewerPage({ params }: Props) {
   const remaining = daysLeft(data.expires_at)
   // DB locked 또는 expires_at 경과 시 잠금 처리 (크론 미실행 방어)
   const isLocked = data.locked || new Date(data.expires_at) < new Date()
+  const isHtmlPage = !!data.html_content
+
+  // ── HTML 페이지 — 풀스크린 iframe srcdoc 렌더링 ──────────────
+  if (isHtmlPage) {
+    if (isLocked) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-popup-white text-center px-6">
+          <div className="text-4xl">🔒</div>
+          <p className="text-lg font-semibold text-popup-text">페이지 사용 기간이 만료되었습니다</p>
+          <p className="text-sm text-popup-muted">30일 무료 기간이 종료되어 콘텐츠가 잠겼습니다.</p>
+          <a href={`/${slug}/edit`} className="rounded-lg bg-popup-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-popup-accent-hover">
+            잠금 해제하기
+          </a>
+        </div>
+      )
+    }
+    return (
+      <div style={{ height: '100vh', overflow: 'hidden', margin: 0, padding: 0 }}>
+        <iframe
+          srcDoc={data.html_content!}
+          sandbox="allow-scripts allow-forms allow-popups allow-modals"
+          style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+          title="HTML Page"
+        />
+      </div>
+    )
+  }
 
   // JSON-LD 구조화 데이터
   const titleBlock = blocks.find((b) => b.type === 'h1' && (b as { content?: string }).content?.trim())

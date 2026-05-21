@@ -8,6 +8,7 @@ import type { Block } from '@/types'
 
 interface PageData {
   blocks: Block[]
+  htmlContent?: string | null
   locked: boolean
   daysLeft: number
 }
@@ -25,7 +26,7 @@ export default function EditPage() {
       const res = await fetch(`/api/pages/${slug}`)
       if (!res.ok) { setError('페이지를 찾을 수 없습니다.'); setLoading(false); return }
       const data = await res.json()
-      setPageData({ blocks: data.blocks, locked: data.locked, daysLeft: data.daysLeft })
+      setPageData({ blocks: data.blocks, htmlContent: data.htmlContent ?? null, locked: data.locked, daysLeft: data.daysLeft })
 
       const stored = localStorage.getItem(`popup_token_${slug}`)
       if (stored) { setEditToken(stored) }
@@ -51,6 +52,13 @@ export default function EditPage() {
     <div className="flex min-h-screen flex-col items-center justify-center gap-3">
       <p className="text-popup-muted">{error}</p>
       <a href="/" className="text-sm text-popup-accent underline">홈으로</a>
+    </div>
+  )
+
+  if (pageData?.htmlContent) return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
+      <p className="text-popup-muted">HTML 페이지는 블록 에디터로 편집할 수 없습니다.</p>
+      <a href={`/${slug}`} className="text-sm text-popup-accent underline">페이지 보기 →</a>
     </div>
   )
 

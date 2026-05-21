@@ -59,20 +59,21 @@ function buildServer(): McpServer {
       instructions: `
 Popup creates instant shareable web pages — no login required.
 
-## ⚠️ MANDATORY RULE — ALWAYS FOLLOW BEFORE create_page
-Before calling create_page, you MUST ask the user to choose their own edit PIN.
+## ⚠️ MANDATORY RULE — ALWAYS FOLLOW BEFORE create_page OR create_html_page
+Before calling create_page or create_html_page, you MUST ask the user to choose their own edit PIN.
 Say exactly: "편집 비밀번호(PIN)를 4자리 이상으로 직접 정해주세요. 나중에 이 번호로 수정할 수 있어요."
 Wait for the user's reply. Use ONLY the PIN the user provides.
 NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
 
 ## Page building guide
-Combine blocks: h1/h2 (headings), text (body), image (url), button (label+href),
-youtube (videoId), link (url+title), divider.
+- Block-based pages: use create_page with h1/h2/text/image/button/youtube/link/divider blocks.
+- Raw HTML pages: use create_html_page when the user provides complete HTML. Renders fullscreen exactly as-is.
 
 ## Examples
-- "카페 소개 페이지" → h1 + text + image + button
-- "행사 초대장" → h1 + text + button(RSVP)
-- "링크 모음" → h1 + multiple link blocks
+- "카페 소개 페이지" → create_page: h1 + text + image + button
+- "행사 초대장" → create_page: h1 + text + button(RSVP)
+- "링크 모음" → create_page: h1 + multiple link blocks
+- "이 HTML 파일 공유해줘" → create_html_page with the HTML content
       `.trim(),
     },
   )
@@ -120,6 +121,58 @@ youtube (videoId), link (url+title), divider.
             `📅 유효기간: ${DEFAULT_DAYS}일`,
             ``,
             `편집 링크: ${BASE}/${slug}/edit`,
+          ].join('\n'),
+        }],
+      }
+    },
+  )
+
+  // ── Tool: create_html_page ──────────────────────────────────
+  server.tool(
+    'create_html_page',
+    'Creates a Popup page from raw HTML. Renders fullscreen exactly as-is — use for presentations, reports, visualizations, custom designs. IMPORTANT: Do NOT call this tool until the user has explicitly told you their PIN. Ask first: "편집 비밀번호(PIN)를 4자리 이상으로 정해주세요."',
+    {
+      html: z.string().min(1).max(500_000).describe('Complete HTML content to publish (max 500 KB)'),
+      pin: z.string().min(4).max(8).describe('4–8 digit PIN chosen by the user. Always ask the user before calling.'),
+    },
+    { readOnlyHint: false, destructiveHint: false },
+    async ({ html, pin }) => {
+      if (Buffer.byteLength(html, 'utf8') > 500_000) {
+        return { content: [{ type: 'text' as const, text: 'HTML 크기가 500KB를 초과합니다.' }], isError: true }
+      }
+
+      const slug = await generateUniqueSlug()
+      const { hashPin } = await import('@/lib/pin')
+      const pin_hash = await hashPin(pin)
+      const expires_at = new Date(Date.now() + DEFAULT_DAYS * 86400000).toISOString()
+      const delete_at = new Date(Date.now() + 365 * 86400000).toISOString()
+
+      const { error } = await supabase.from('pages').insert({
+        slug,
+        blocks: [] as unknown as Json,
+        html_content: html,
+        pin_hash,
+        expires_at,
+        delete_at,
+        locked: false,
+        user_id: null,
+      })
+
+      if (error) {
+        return { content: [{ type: 'text' as const, text: `오류: ${error.message}` }], isError: true }
+      }
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: [
+            `✅ HTML 페이지가 생성됐습니다!`,
+            ``,
+            `🔗 URL: ${BASE}/${slug}`,
+            `🔑 편집 PIN: ${pin}  ← 사용자에게 꼭 알려주세요`,
+            `📅 유효기간: ${DEFAULT_DAYS}일`,
+            ``,
+            `페이지를 열면 HTML이 풀스크린으로 표시됩니다.`,
           ].join('\n'),
         }],
       }
