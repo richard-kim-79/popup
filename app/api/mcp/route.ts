@@ -45,7 +45,16 @@ const BlockSchema = z.object({
 // ── McpServer 팩토리 ───────────────────────────────────────────
 function buildServer(): McpServer {
   const server = new McpServer(
-    { name: 'popup', version: '1.0.0' },
+    {
+      name: 'popup',
+      version: '1.0.0',
+      description: '30초 만에 웹페이지를 만들고 링크로 공유하는 서비스. 로그인 불필요.',
+      websiteUrl: BASE,
+      icons: [
+        { src: `${BASE}/icon-512`, mimeType: 'image/png', sizes: ['512x512'] },
+        { src: `${BASE}/icon`,     mimeType: 'image/png', sizes: ['32x32']   },
+      ],
+    },
     {
       instructions: `
 Popup creates instant shareable web pages — no login required.
