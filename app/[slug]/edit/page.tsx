@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Editor from '@/components/Editor'
 import PinModal from '@/components/Modal/PinModal'
+import ShareModal from '@/components/Modal/ShareModal'
 import type { Block } from '@/types'
 
 interface PageData {
@@ -18,6 +19,7 @@ export default function EditPage() {
   const [pageData, setPageData] = useState<PageData | null>(null)
   const [editToken, setEditToken] = useState<string | null>(null)
   const [showPin, setShowPin] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -56,10 +58,27 @@ export default function EditPage() {
   )
 
   if (pageData?.htmlContent) return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
-      <p className="text-popup-muted">HTML 페이지는 블록 에디터로 편집할 수 없습니다.</p>
-      <a href={`/${slug}`} className="text-sm text-popup-accent underline">페이지 보기 →</a>
-    </div>
+    <>
+      {showShare && <ShareModal slug={slug} onClose={() => setShowShare(false)} />}
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-4 text-center">
+        <div className="text-3xl">📄</div>
+        <p className="text-sm text-popup-muted">HTML 페이지는 블록 에디터로 편집할 수 없습니다.</p>
+        <div className="flex gap-3">
+          <a
+            href={`/${slug}`}
+            className="rounded-xl border border-popup-border px-5 py-2.5 text-sm text-popup-text hover:bg-popup-surface transition-colors"
+          >
+            페이지 보기 →
+          </a>
+          <button
+            onClick={() => setShowShare(true)}
+            className="rounded-xl bg-popup-accent px-5 py-2.5 text-sm font-medium text-popup-accent-fg hover:bg-popup-accent-hover transition-colors"
+          >
+            공유하기
+          </button>
+        </div>
+      </div>
+    </>
   )
 
   if (!editToken || !pageData) return (
