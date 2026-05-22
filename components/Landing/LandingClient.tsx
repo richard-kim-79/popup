@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function LandingClient() {
@@ -9,6 +9,27 @@ export default function LandingClient() {
   const [htmlUploading, setHtmlUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 전체 페이지 드래그 감지
+  useEffect(() => {
+    const onDragOver = (e: DragEvent) => { e.preventDefault(); setDragOver(true) }
+    const onDragLeave = (e: DragEvent) => { if (!e.relatedTarget) setDragOver(false) }
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault()
+      setDragOver(false)
+      const file = e.dataTransfer?.files?.[0]
+      if (file) void handleHtmlFile(file)
+    }
+    document.addEventListener('dragover', onDragOver)
+    document.addEventListener('dragleave', onDragLeave)
+    document.addEventListener('drop', onDrop)
+    return () => {
+      document.removeEventListener('dragover', onDragOver)
+      document.removeEventListener('dragleave', onDragLeave)
+      document.removeEventListener('drop', onDrop)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── 블록 페이지 생성 ───────────────────────────────────────────
   const handleCreate = async () => {
@@ -86,6 +107,17 @@ export default function LandingClient() {
 
   return (
     <>
+      {/* ── 전체 페이지 드롭존 오버레이 ──────────────────────── */}
+      {dragOver && (
+        <div className="fixed inset-0 z-[500] flex flex-col items-center justify-center gap-3 bg-popup-accent/10 backdrop-blur-[2px] pointer-events-none">
+          <div className="rounded-2xl border-2 border-dashed border-popup-accent bg-popup-white/90 px-12 py-8 text-center shadow-xl">
+            <p className="text-4xl mb-3">📄</p>
+            <p className="text-base font-semibold text-popup-accent">HTML 파일을 놓으세요</p>
+            <p className="mt-1 text-xs text-popup-muted">.html · 최대 500KB</p>
+          </div>
+        </div>
+      )}
+
       {/* ── 메인 버튼 ─────────────────────────────────────────── */}
       <button
         onClick={handleCreate}
@@ -95,21 +127,14 @@ export default function LandingClient() {
         {creating ? '만드는 중…' : '새 팝업 페이지 만들기'}
       </button>
 
-      {/* ── HTML 파일 업로드 ──────────────────────────────────── */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
+      {/* ── HTML 파일 업로드 (텍스트 링크) ─────────────────────── */}
+      <button
         onClick={() => !isLoading && fileInputRef.current?.click()}
-        className={`mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-3 text-sm transition-colors ${
-          dragOver
-            ? 'border-popup-accent bg-popup-accentBg text-popup-accent'
-            : 'border-popup-faint text-popup-muted hover:border-popup-accent hover:text-popup-accent'
-        } ${isLoading ? 'pointer-events-none opacity-50' : ''}`}
+        disabled={isLoading}
+        className="mt-1 text-sm text-popup-muted underline-offset-2 hover:text-popup-accent hover:underline transition-colors disabled:opacity-50"
       >
-        <span className="text-base">📄</span>
-        <span>{htmlUploading ? 'HTML 업로드 중…' : 'HTML 파일로 시작 (.html · 최대 500KB)'}</span>
-      </div>
+        {htmlUploading ? 'HTML 업로드 중…' : 'HTML 파일 업로드'}
+      </button>
 
       <input
         ref={fileInputRef}
