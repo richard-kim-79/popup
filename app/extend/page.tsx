@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { isFreeExtensionPeriod, PROMO_HEADLINE } from '@/lib/promo'
 import type { Plan } from '@/types'
 
 type Step = 'url' | 'plan' | 'auth' | 'pay'
@@ -20,8 +22,10 @@ function extractSlug(input: string): string {
 }
 
 export default function ExtendPage() {
+  const router = useRouter()
   const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com').replace(/\/$/, '')
   const BASE_DOMAIN = BASE_URL.replace(/^https?:\/\//, '')
+  const promo = isFreeExtensionPeriod()
 
   const [step, setStep]           = useState<Step>('url')
   const [urlInput, setUrlInput]   = useState('')
@@ -63,9 +67,32 @@ export default function ExtendPage() {
     setUrlLoading(false)
   }
 
+  // ── 무료 연장 처리 ────────────────────────────────────────
+  const handleFreeExtend = async () => {
+    if (paying) return
+    setPaying(true)
+    try {
+      const res = await fetch('/api/payments/free-extend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, plan, email: email || undefined }),
+      })
+      const data = await res.json() as { ok?: boolean; error?: string }
+      if (!res.ok || !data.ok) {
+        alert(data.error ?? '연장에 실패했습니다.')
+        setPaying(false)
+        return
+      }
+      router.push(`/payment/success?slug=${slug}&email=${encodeURIComponent(email)}`)
+    } catch {
+      alert('네트워크 오류가 발생했습니다.')
+      setPaying(false)
+    }
+  }
+
   // ── TossPayments 위젯 마운트 ──────────────────────────────
   useEffect(() => {
-    if (step !== 'pay') return
+    if (step !== 'pay' || promo) return  // 프로모 기간엔 위젯 마운트 스킵
     let cancelled = false
 
     const mountWidget = async () => {
@@ -111,7 +138,7 @@ export default function ExtendPage() {
     setWidgetReady(false)
     void mountWidget()
     return () => { cancelled = true }
-  }, [step, plan, slug, selectedPlan.amount])
+  }, [step, plan, slug, selectedPlan.amount, promo])
 
   // ── 결제 요청 ─────────────────────────────────────────────
   const handlePay = async () => {
@@ -181,7 +208,13 @@ export default function ExtendPage() {
           <>
             <button onClick={() => setStep('url')} className="mb-6 text-xs text-popup-muted hover:text-popup-text">← 뒤로</button>
             <h1 className="mb-1 text-xl font-bold text-popup-text">플랜 선택</h1>
-            <p className="mb-6 text-xs text-popup-faint font-mono">{BASE_DOMAIN}/{slug}</p>
+            <p className="mb-4 text-xs text-popup-faint font-mono">{BASE_DOMAIN}/{slug}</p>
+
+            {promo && (
+              <div className="mb-4 rounded-lg border border-popup-accent/30 bg-popup-accent-bg px-3 py-2.5 text-center text-xs font-medium text-popup-accent">
+                {PROMO_HEADLINE}
+              </div>
+            )}
 
             <div className="mb-4 flex flex-col gap-2">
               {PLANS.map((p) => (
@@ -206,7 +239,14 @@ export default function ExtendPage() {
                       <div className="text-[11px] text-popup-muted">{p.sub}</div>
                     </div>
                   </div>
-                  <span className={`text-sm font-semibold ${plan === p.id ? 'text-popup-accent' : 'text-popup-text'}`}>{p.price}</span>
+                  {promo ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-popup-faint line-through">{p.price}</span>
+                      <span className={`text-sm font-semibold ${plan === p.id ? 'text-popup-accent' : 'text-popup-text'}`}>무료</span>
+                    </div>
+                  ) : (
+                    <span className={`text-sm font-semibold ${plan === p.id ? 'text-popup-accent' : 'text-popup-text'}`}>{p.price}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -217,7 +257,9 @@ export default function ExtendPage() {
             >
               계속하기
             </button>
-            <p className="mt-2 text-center text-[11px] text-popup-faint">토스페이먼츠 · 카드/간편결제</p>
+            <p className="mt-2 text-center text-[11px] text-popup-faint">
+              {promo ? '이벤트 기간 · 결제 없이 바로 연장' : '토스페이먼츠 · 카드/간편결제'}
+            </p>
           </>
         )}
 
@@ -246,8 +288,8 @@ export default function ExtendPage() {
           </>
         )}
 
-        {/* ── STEP 4: 결제 ──────────────────────────────── */}
-        {step === 'pay' && (
+        {/* ── STEP 4: 결제 (또는 무료 연장 확정) ────────── */}
+        {step === 'pay' && !promo && (
           <>
             <button onClick={() => setStep('auth')} className="mb-4 text-xs text-popup-muted hover:text-popup-text">← 뒤로</button>
 
@@ -272,6 +314,26 @@ export default function ExtendPage() {
               style={{ background: '#3182F6' }}
             >
               {paying ? '처리 중…' : `${selectedPlan.price} 결제하기`}
+            </button>
+          </>
+        )}
+
+        {step === 'pay' && promo && (
+          <>
+            <button onClick={() => setStep('auth')} className="mb-4 text-xs text-popup-muted hover:text-popup-text">← 뒤로</button>
+
+            <div className="mb-5 rounded-2xl border border-popup-accent/30 bg-popup-accent-bg px-5 py-6 text-center">
+              <p className="text-2xl mb-2">🎉</p>
+              <p className="text-base font-semibold text-popup-accent mb-1">{selectedPlan.label} 무료</p>
+              <p className="text-xs text-popup-muted">이벤트 기간 · 결제 없이 바로 연장</p>
+            </div>
+
+            <button
+              onClick={() => void handleFreeExtend()}
+              disabled={paying}
+              className="w-full rounded-lg bg-popup-accent py-3 text-sm font-semibold text-popup-accent-fg hover:bg-popup-accent-hover disabled:opacity-50"
+            >
+              {paying ? '연장 중…' : '🎉 무료로 연장하기'}
             </button>
           </>
         )}

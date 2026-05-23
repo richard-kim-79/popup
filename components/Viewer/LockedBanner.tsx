@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import UpgradeModal from '@/components/Modal/UpgradeModal'
+import { isFreeExtensionPeriod } from '@/lib/promo'
 
 interface Props {
   slug: string
@@ -9,6 +10,7 @@ interface Props {
 
 export default function LockedBanner({ slug }: Props) {
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const promo = isFreeExtensionPeriod()
 
   return (
     <>
@@ -18,7 +20,7 @@ export default function LockedBanner({ slug }: Props) {
           onClick={() => setShowUpgrade(true)}
           className="font-medium underline hover:opacity-80"
         >
-          잠금 해제하기
+          {promo ? '🎉 무료로 잠금 해제하기' : '잠금 해제하기'}
         </button>
       </div>
 

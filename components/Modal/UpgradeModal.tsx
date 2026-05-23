@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Modal from '@/components/UI/Modal'
+import { isFreeExtensionPeriod, PROMO_HEADLINE } from '@/lib/promo'
 import type { Plan } from '@/types'
 
 interface Props {
@@ -25,12 +26,37 @@ export default function UpgradeModal({ slug, onClose }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const widgetsRef = useRef<any>(null)
   const orderIdRef = useRef<string>('')
+  const promo = isFreeExtensionPeriod()
 
   const selectedPlan = PLANS.find((p) => p.id === plan)!
 
-  // 결제위젯 마운트 — pay 스텝 진입 시
+  // ── 무료 연장 처리 ────────────────────────────────────────
+  const handleFreeExtend = async () => {
+    if (paying) return
+    setPaying(true)
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? '').trim()
+    try {
+      const res = await fetch('/api/payments/free-extend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, plan, email: email || undefined }),
+      })
+      const data = await res.json() as { ok?: boolean; error?: string }
+      if (!res.ok || !data.ok) {
+        alert(data.error ?? '연장에 실패했습니다.')
+        setPaying(false)
+        return
+      }
+      window.location.href = `${baseUrl}/payment/success?slug=${slug}&email=${encodeURIComponent(email)}`
+    } catch {
+      alert('네트워크 오류가 발생했습니다.')
+      setPaying(false)
+    }
+  }
+
+  // 결제위젯 마운트 — pay 스텝 진입 시 (프로모 기간이면 스킵)
   useEffect(() => {
-    if (step !== 'pay') return
+    if (step !== 'pay' || promo) return
 
     let cancelled = false
 
@@ -80,7 +106,7 @@ export default function UpgradeModal({ slug, onClose }: Props) {
     void mountWidget()
 
     return () => { cancelled = true }
-  }, [step, plan, slug, selectedPlan.amount])
+  }, [step, plan, slug, selectedPlan.amount, promo])
 
   const handlePay = async () => {
     if (!widgetsRef.current || !widgetReady) return
@@ -111,7 +137,13 @@ export default function UpgradeModal({ slug, onClose }: Props) {
     <Modal onClose={onClose} maxWidth={step === 'pay' ? 480 : 380}>
       {step === 'plan' && (
         <>
-          <p className="mb-4 text-sm text-popup-muted">플랜을 선택하세요</p>
+          <p className="mb-3 text-sm text-popup-muted">플랜을 선택하세요</p>
+
+          {promo && (
+            <div className="mb-4 rounded-lg border border-popup-accent/30 bg-popup-accent-bg px-3 py-2.5 text-center text-xs font-medium text-popup-accent">
+              {PROMO_HEADLINE}
+            </div>
+          )}
 
           <div className="mb-4 flex flex-col gap-2">
             {PLANS.map((p) => (
@@ -136,7 +168,14 @@ export default function UpgradeModal({ slug, onClose }: Props) {
                     <div className="text-[11px] text-popup-muted">{p.sub}</div>
                   </div>
                 </div>
-                <span className={`text-sm font-semibold ${plan === p.id ? 'text-popup-accent' : 'text-popup-text'}`}>{p.price}</span>
+                {promo ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-popup-faint line-through">{p.price}</span>
+                    <span className={`text-sm font-semibold ${plan === p.id ? 'text-popup-accent' : 'text-popup-text'}`}>무료</span>
+                  </div>
+                ) : (
+                  <span className={`text-sm font-semibold ${plan === p.id ? 'text-popup-accent' : 'text-popup-text'}`}>{p.price}</span>
+                )}
               </div>
             ))}
           </div>
@@ -147,7 +186,9 @@ export default function UpgradeModal({ slug, onClose }: Props) {
           >
             계속하기
           </button>
-          <p className="mt-2 text-center text-[11px] text-popup-faint">토스페이먼츠 · 카드/간편결제</p>
+          <p className="mt-2 text-center text-[11px] text-popup-faint">
+            {promo ? '이벤트 기간 · 결제 없이 바로 연장' : '토스페이먼츠 · 카드/간편결제'}
+          </p>
         </>
       )}
 
@@ -175,7 +216,7 @@ export default function UpgradeModal({ slug, onClose }: Props) {
         </>
       )}
 
-      {step === 'pay' && (
+      {step === 'pay' && !promo && (
         <>
           <button onClick={() => setStep('auth')} className="mb-3 text-xs text-popup-muted hover:text-popup-text">← 뒤로</button>
 
@@ -201,6 +242,26 @@ export default function UpgradeModal({ slug, onClose }: Props) {
             style={{ background: '#3182F6' }}
           >
             {paying ? '처리 중…' : '결제하기'}
+          </button>
+        </>
+      )}
+
+      {step === 'pay' && promo && (
+        <>
+          <button onClick={() => setStep('auth')} className="mb-3 text-xs text-popup-muted hover:text-popup-text">← 뒤로</button>
+
+          <div className="mb-4 rounded-2xl border border-popup-accent/30 bg-popup-accent-bg px-5 py-6 text-center">
+            <p className="text-2xl mb-2">🎉</p>
+            <p className="text-base font-semibold text-popup-accent mb-1">{selectedPlan.label} 무료</p>
+            <p className="text-xs text-popup-muted">이벤트 기간 · 결제 없이 바로 연장</p>
+          </div>
+
+          <button
+            onClick={() => void handleFreeExtend()}
+            disabled={paying}
+            className="w-full rounded-lg bg-popup-accent py-3 text-sm font-semibold text-popup-accent-fg hover:bg-popup-accent-hover disabled:opacity-50"
+          >
+            {paying ? '연장 중…' : '🎉 무료로 연장하기'}
           </button>
         </>
       )}
