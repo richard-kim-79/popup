@@ -47,7 +47,7 @@ export default function UpgradeModal({ slug, onClose }: Props) {
         setPaying(false)
         return
       }
-      window.location.href = `${baseUrl}/payment/success?slug=${slug}&email=${encodeURIComponent(email)}`
+      window.location.href = `${baseUrl}/payment/success?slug=${slug}&email=${encodeURIComponent(email)}&free=1`
     } catch {
       alert('네트워크 오류가 발생했습니다.')
       setPaying(false)

@@ -9,14 +9,28 @@ function SuccessInner() {
   const router = useRouter()
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
   const [message, setMessage] = useState('')
+  const isFree = searchParams.get('free') === '1'
 
   useEffect(() => {
     const paymentKey = searchParams.get('paymentKey')
     const orderId    = searchParams.get('orderId')
     const amount     = searchParams.get('amount')
+    const isFree     = searchParams.get('free') === '1'
     // slug는 query param 우선, 없으면 orderId에서 추출 (형식: {slug}_{plan}_{ts})
     const slug = searchParams.get('slug') ?? orderId?.split('_')[0] ?? null
     const email = searchParams.get('email') ?? ''
+
+    // ── 무료 연장: API에서 이미 처리 완료, 성공 화면만 표시 ──
+    if (isFree) {
+      if (!slug) {
+        setStatus('error')
+        setMessage('연장 정보가 없습니다.')
+        return
+      }
+      setStatus('ok')
+      setTimeout(() => router.push(`/${slug}/edit`), 2000)
+      return
+    }
 
     if (!paymentKey || !orderId || !amount) {
       setStatus('error')
@@ -45,8 +59,10 @@ function SuccessInner() {
         {status === 'loading' && <p className="text-popup-muted">결제를 처리하는 중...</p>}
         {status === 'ok' && (
           <>
-            <div className="mb-4 text-5xl">🌿</div>
-            <h1 className="mb-2 text-xl font-bold text-popup-text">결제 완료!</h1>
+            <div className="mb-4 text-5xl">{isFree ? '🎉' : '🌿'}</div>
+            <h1 className="mb-2 text-xl font-bold text-popup-text">
+              {isFree ? '무료 연장 완료!' : '결제 완료!'}
+            </h1>
             <p className="text-sm text-popup-muted">잠시 후 에디터로 이동합니다...</p>
           </>
         )}

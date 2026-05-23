@@ -83,7 +83,7 @@ export default function ExtendPage() {
         setPaying(false)
         return
       }
-      router.push(`/payment/success?slug=${slug}&email=${encodeURIComponent(email)}`)
+      router.push(`/payment/success?slug=${slug}&email=${encodeURIComponent(email)}&free=1`)
     } catch {
       alert('네트워크 오류가 발생했습니다.')
       setPaying(false)
