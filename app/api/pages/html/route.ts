@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase-server'
+import { getSupabaseAdmin, getSupabaseServer } from '@/lib/supabase-server'
 import { hashPin } from '@/lib/pin'
 import { issueEditToken } from '@/lib/token'
 import { generateUniqueSlug } from '@/lib/slug'
@@ -28,6 +28,11 @@ export async function POST(
     return NextResponse.json({ error: 'HTML 크기는 500KB를 초과할 수 없습니다.' }, { status: 400 })
   }
 
+  // 로그인 세션이 있으면 user_id 자동 연결
+  const session = await getSupabaseServer()
+  const { data: userData } = await session.auth.getUser()
+  const userId = userData?.user?.id ?? null
+
   const supabase = getSupabaseAdmin()
   const slug = await generateUniqueSlug()
   const pin_hash = await hashPin(body.pin)
@@ -44,7 +49,7 @@ export async function POST(
     expires_at,
     delete_at,
     locked: false,
-    user_id: null,
+    user_id: userId,
   })
 
   if (error) {

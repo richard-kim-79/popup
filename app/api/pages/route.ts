@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase-server'
+import { getSupabaseAdmin, getSupabaseServer } from '@/lib/supabase-server'
 import { hashPin } from '@/lib/pin'
 import { issueEditToken } from '@/lib/token'
 import { generateUniqueSlug } from '@/lib/slug'
@@ -11,6 +11,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreatePageRes
   if (!body?.pin || typeof body.pin !== 'string' || body.pin.length < 4 || body.pin.length > 8) {
     return NextResponse.json({ error: 'PIN은 4~8자리여야 합니다.' }, { status: 400 })
   }
+
+  // 로그인 세션이 있으면 user_id 자동 연결
+  const session = await getSupabaseServer()
+  const { data: userData } = await session.auth.getUser()
+  const userId = userData?.user?.id ?? null
 
   const supabase = getSupabaseAdmin()
   const slug = await generateUniqueSlug()
@@ -27,7 +32,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreatePageRes
     expires_at,
     delete_at,
     locked: false,
-    user_id: null,
+    user_id: userId,
   })
 
   if (error) {
