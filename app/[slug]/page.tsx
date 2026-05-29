@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import ReportButton from '@/components/ReportButton'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { daysLeft } from '@/lib/slug'
+import { extractHtmlMeta } from '@/lib/html-meta'
 import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
 import SocialEmbed from '@/components/Blocks/SocialEmbed'
 import ExpiryUpgradeButton from '@/components/Viewer/ExpiryUpgradeButton'
@@ -51,12 +52,35 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const isLocked = (data?.locked ?? false) || (data?.expires_at ? new Date(data.expires_at) < new Date() : false)
 
-  // HTML 페이지는 블록 없음 — 기본 메타 사용
+  // HTML 페이지 — 업로드된 HTML 안의 <title>·og:* 메타 우선 사용
   if (data?.html_content) {
+    const meta = extractHtmlMeta(data.html_content)
+    const title = meta.title?.trim() || 'HTML 페이지'
+    const description = meta.description?.trim() || '30초 만에 웹페이지를 만들고 링크로 공유하세요'
+    const pageUrl = `${BASE}/${slug}`
+    // og:image 우선순위: HTML이 명시한 절대 URL > 동적 OG 라우트(자동 fallback)
+    // 사용자 HTML에 og:image가 없으면 ${BASE}/${slug}/opengraph-image가 자동 생성됨
+    const images = meta.image ? [meta.image] : undefined
+
     return {
-      title: 'HTML 페이지 | Popup',
-      description: '30초 만에 웹페이지를 만들고 링크로 공유하세요',
+      title,
+      description,
       robots: isLocked ? { index: false, follow: false } : { index: true, follow: true },
+      alternates: { canonical: pageUrl },
+      openGraph: {
+        title,
+        description,
+        url: pageUrl,
+        siteName: 'Popup',
+        type: 'website',
+        ...(images ? { images } : {}),
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        description,
+        ...(images ? { images } : {}),
+      },
     }
   }
 
