@@ -2,17 +2,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServer } from '@/lib/supabase-server'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const { searchParams, origin } = new URL(req.url)
+  const url = new URL(req.url)
+  const { searchParams } = url
+  // Vercel 뒤에서 origin이 내부 URL일 수 있어 환경변수 우선 사용
+  const origin = (process.env.NEXT_PUBLIC_BASE_URL ?? url.origin).replace(/\/$/, '')
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/my-pages'
 
-  if (code) {
-    const supabase = await getSupabaseServer()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
-    }
+  // Google이 에러를 직접 돌려보낸 경우 (사용자가 동의 거절 등)
+  const providerError = searchParams.get('error') ?? searchParams.get('error_description')
+  if (providerError) {
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(providerError)}`,
+    )
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+  if (!code) {
+    return NextResponse.redirect(`${origin}/login?error=missing_code`)
+  }
+
+  const supabase = await getSupabaseServer()
+  const { error } = await supabase.auth.exchangeCodeForSession(code)
+  if (error) {
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message)}`,
+    )
+  }
+
+  return NextResponse.redirect(`${origin}${next}`)
 }

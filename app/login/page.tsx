@@ -1,12 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { getSupabaseBrowser } from '@/lib/supabase'
 
-export default function LoginPage() {
+function LoginInner() {
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // URL의 ?error= 파라미터 → 에러 메시지로 표시
+  useEffect(() => {
+    const err = searchParams.get('error')
+    if (err) setError(decodeURIComponent(err))
+  }, [searchParams])
 
   const handleGoogle = async () => {
     setLoading(true)
@@ -64,5 +73,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-popup-muted">불러오는 중…</div>}>
+      <LoginInner />
+    </Suspense>
   )
 }
