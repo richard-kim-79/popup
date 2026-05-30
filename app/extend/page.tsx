@@ -43,6 +43,24 @@ export default function ExtendPage() {
 
   const selectedPlan = PLANS.find((p) => p.id === plan)!
 
+  // ── ?slug= 사전 채움 (잠긴 페이지에서 "연장하기" 클릭 시) ─────
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const prefilled = params.get('slug')?.trim()
+    if (!prefilled || step !== 'url' || slug) return
+    // 페이지 존재 확인 후 STEP 'plan'으로 점프
+    void (async () => {
+      const res = await fetch(`/api/pages/${prefilled}`)
+      if (res.ok) {
+        setSlug(prefilled)
+        setUrlInput(`${BASE_DOMAIN}/${prefilled}`)
+        setStep('plan')
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ── URL 검증 ──────────────────────────────────────────────
   const handleUrlSubmit = async () => {
     const s = extractSlug(urlInput)

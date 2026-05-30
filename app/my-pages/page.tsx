@@ -9,6 +9,7 @@ interface Page {
   title: string
   expires_at: string
   is_html?: boolean
+  locked?: boolean
 }
 
 interface SessionUser {
@@ -69,19 +70,28 @@ export default function MyPagesPage() {
   }, [])
 
   // ── 페이지 등록 (PIN으로 인증) ───────────────────────────────
+  const [regLockedSlug, setRegLockedSlug] = useState<string | null>(null)
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (regLoading) return
     setRegLoading(true)
     setRegError('')
     setRegSuccess('')
+    setRegLockedSlug(null)
     try {
       const res = await fetch('/api/auth/register-page', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slugOrUrl: regUrl, pin: regPin }),
       })
-      const data = await res.json() as { ok?: boolean; slug?: string; title?: string; error?: string }
+      const data = await res.json() as {
+        ok?: boolean
+        slug?: string
+        title?: string
+        locked?: boolean
+        error?: string
+      }
       if (!res.ok || !data.ok) {
         setRegError(data.error ?? '등록에 실패했습니다.')
         setRegLoading(false)
@@ -91,7 +101,13 @@ export default function MyPagesPage() {
       setRegUrl('')
       setRegPin('')
       await loadMine()
-      // 1.5초 후 모달 자동 닫기
+      if (data.locked) {
+        // 잠긴 페이지는 사용자에게 안내 시간을 더 주고 자동 닫기 안 함
+        setRegLockedSlug(data.slug ?? null)
+        setRegLoading(false)
+        return
+      }
+      // 일반 페이지: 1.5초 후 모달 자동 닫기
       setTimeout(() => {
         setShowRegister(false)
         setRegSuccess('')
@@ -110,6 +126,7 @@ export default function MyPagesPage() {
     setRegSuccess('')
     setRegUrl('')
     setRegPin('')
+    setRegLockedSlug(null)
   }
 
   // ── 세션 체크 ────────────────────────────────────────────────
@@ -237,6 +254,7 @@ export default function MyPagesPage() {
               <div className="flex flex-col gap-3">
                 {pages.map((p) => {
                   const left = daysLeft(p.expires_at)
+                  const isLocked = !!p.locked || left <= 0
                   return (
                     <div key={p.slug} className="flex items-center justify-between rounded-xl border border-popup-border bg-popup-white px-5 py-4">
                       <div className="min-w-0">
@@ -245,14 +263,28 @@ export default function MyPagesPage() {
                           {p.is_html && (
                             <span className="rounded bg-popup-surface px-1.5 py-0.5 text-[10px] text-popup-muted">HTML</span>
                           )}
+                          {isLocked && (
+                            <span className="rounded bg-popup-warn-bg border border-popup-warn-border px-1.5 py-0.5 text-[10px] font-medium text-popup-warn">
+                              🔒 잠김
+                            </span>
+                          )}
                         </div>
                         <p className="mt-0.5 text-xs text-popup-faint">
-                          {left > 0 ? `${left}일 남음` : '소멸됨'}
+                          {left > 0 ? `${left}일 남음` : '만료됨'}
                         </p>
                       </div>
                       <div className="ml-4 flex shrink-0 gap-2">
                         <Link href={`/${p.slug}`} className="rounded-md px-3 py-1.5 text-xs text-popup-muted hover:bg-popup-surface">보기</Link>
-                        <Link href={`/${p.slug}/edit`} className="rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover">편집</Link>
+                        {isLocked ? (
+                          <Link
+                            href={`/extend?slug=${p.slug}`}
+                            className="rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover"
+                          >
+                            연장하기
+                          </Link>
+                        ) : (
+                          <Link href={`/${p.slug}/edit`} className="rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover">편집</Link>
+                        )}
                       </div>
                     </div>
                   )
@@ -374,8 +406,20 @@ export default function MyPagesPage() {
               {regError && (
                 <p className="mb-3 text-xs text-red-400">{regError}</p>
               )}
-              {regSuccess && (
+              {regSuccess && !regLockedSlug && (
                 <p className="mb-3 text-xs text-popup-accent">✓ {regSuccess}</p>
+              )}
+              {regSuccess && regLockedSlug && (
+                <div className="mb-3 rounded-lg border border-popup-warn-border bg-popup-warn-bg px-3 py-2.5 text-xs">
+                  <p className="text-popup-accent font-medium mb-1">✓ {regSuccess}</p>
+                  <p className="text-popup-warn">🔒 잠금 상태 — 편집하려면 연장이 필요해요.</p>
+                  <Link
+                    href={`/extend?slug=${regLockedSlug}`}
+                    className="mt-2 inline-block rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover"
+                  >
+                    지금 연장하기 →
+                  </Link>
+                </div>
               )}
 
               <div className="flex gap-2">

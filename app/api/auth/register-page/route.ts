@@ -12,6 +12,8 @@ interface SuccessResponse {
   ok: true
   slug: string
   title: string
+  locked: boolean
+  expiresAt: string
 }
 
 /** URL 입력에서 slug 추출 (https://popup2026.com/abc123, abc123 등 모두 처리) */
@@ -49,7 +51,7 @@ export async function POST(
   // 페이지 조회
   const { data: page } = await admin
     .from('pages')
-    .select('id, slug, blocks, html_content, pin_hash, user_id, deleted_at')
+    .select('id, slug, blocks, html_content, pin_hash, user_id, locked, expires_at, deleted_at')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
@@ -58,10 +60,18 @@ export async function POST(
     return NextResponse.json({ error: '해당 페이지를 찾을 수 없습니다.' }, { status: 404 })
   }
 
+  // 잠금 여부 (수동 잠금 OR 만료)
+  const isLocked = page.locked || new Date(page.expires_at) < new Date()
+
   // 이미 본인 소유면 멱등성 처리
   if (page.user_id === userId) {
-    const title = extractTitle(page)
-    return NextResponse.json({ ok: true, slug: page.slug, title })
+    return NextResponse.json({
+      ok: true,
+      slug: page.slug,
+      title: extractTitle(page),
+      locked: isLocked,
+      expiresAt: page.expires_at,
+    })
   }
 
   // PIN 검증
@@ -80,7 +90,13 @@ export async function POST(
     return NextResponse.json({ error: '등록에 실패했습니다.' }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, slug: page.slug, title: extractTitle(page) })
+  return NextResponse.json({
+    ok: true,
+    slug: page.slug,
+    title: extractTitle(page),
+    locked: isLocked,
+    expiresAt: page.expires_at,
+  })
 }
 
 function extractTitle(page: { blocks: unknown; html_content: string | null; slug: string }): string {

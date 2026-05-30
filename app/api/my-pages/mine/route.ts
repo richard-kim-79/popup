@@ -6,6 +6,7 @@ interface PageResult {
   title: string
   expires_at: string
   is_html: boolean
+  locked: boolean
 }
 
 interface Block { type: string; content?: string }
@@ -25,7 +26,7 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
   // 1) user_id 직접 소유
   const { data: owned } = await supabase
     .from('pages')
-    .select('slug, blocks, expires_at, html_content, deleted_at')
+    .select('slug, blocks, expires_at, html_content, locked, deleted_at')
     .eq('user_id', user.id)
     .is('deleted_at', null)
 
@@ -33,14 +34,14 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
   const { data: linked } = email
     ? await supabase
         .from('page_emails')
-        .select('pages(slug, blocks, expires_at, html_content, deleted_at)')
+        .select('pages(slug, blocks, expires_at, html_content, locked, deleted_at)')
         .eq('email', email)
-    : { data: [] as Array<{ pages: { slug: string; blocks: unknown; expires_at: string; html_content: string | null; deleted_at: string | null } | null }> }
+    : { data: [] as Array<{ pages: { slug: string; blocks: unknown; expires_at: string; html_content: string | null; locked: boolean; deleted_at: string | null } | null }> }
 
   const seen = new Set<string>()
   const pages: PageResult[] = []
 
-  const pushPage = (row: { slug: string; blocks: unknown; expires_at: string; html_content: string | null; deleted_at: string | null } | null) => {
+  const pushPage = (row: { slug: string; blocks: unknown; expires_at: string; html_content: string | null; locked: boolean; deleted_at: string | null } | null) => {
     if (!row || row.deleted_at || seen.has(row.slug)) return
     seen.add(row.slug)
     const blocks = (row.blocks ?? []) as Block[]
@@ -51,6 +52,7 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
       title,
       expires_at: row.expires_at,
       is_html: !!row.html_content,
+      locked: row.locked,
     })
   }
 
