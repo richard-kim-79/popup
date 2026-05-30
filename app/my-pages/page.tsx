@@ -26,6 +26,14 @@ export default function MyPagesPage() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // 페이지 등록 모달
+  const [showRegister, setShowRegister] = useState(false)
+  const [regUrl, setRegUrl] = useState('')
+  const [regPin, setRegPin] = useState('')
+  const [regLoading, setRegLoading] = useState(false)
+  const [regError, setRegError] = useState('')
+  const [regSuccess, setRegSuccess] = useState('')
+
   // ── 로컬 토큰으로 페이지 클레임 ───────────────────────────────
   const claimLocalPages = useCallback(async () => {
     const items: { slug: string; token: string }[] = []
@@ -59,6 +67,50 @@ export default function MyPagesPage() {
     const data = await res.json() as { pages?: Page[] }
     if (data.pages) setPages(data.pages)
   }, [])
+
+  // ── 페이지 등록 (PIN으로 인증) ───────────────────────────────
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (regLoading) return
+    setRegLoading(true)
+    setRegError('')
+    setRegSuccess('')
+    try {
+      const res = await fetch('/api/auth/register-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slugOrUrl: regUrl, pin: regPin }),
+      })
+      const data = await res.json() as { ok?: boolean; slug?: string; title?: string; error?: string }
+      if (!res.ok || !data.ok) {
+        setRegError(data.error ?? '등록에 실패했습니다.')
+        setRegLoading(false)
+        return
+      }
+      setRegSuccess(`"${data.title}" 페이지가 등록됐어요.`)
+      setRegUrl('')
+      setRegPin('')
+      await loadMine()
+      // 1.5초 후 모달 자동 닫기
+      setTimeout(() => {
+        setShowRegister(false)
+        setRegSuccess('')
+      }, 1500)
+    } catch {
+      setRegError('네트워크 오류가 발생했습니다.')
+    } finally {
+      setRegLoading(false)
+    }
+  }
+
+  const closeRegister = () => {
+    if (regLoading) return
+    setShowRegister(false)
+    setRegError('')
+    setRegSuccess('')
+    setRegUrl('')
+    setRegPin('')
+  }
 
   // ── 세션 체크 ────────────────────────────────────────────────
   useEffect(() => {
@@ -132,18 +184,27 @@ export default function MyPagesPage() {
         {/* ── 로그인된 사용자 ─────────────────────────────────── */}
         {user ? (
           <>
-            <div className="mb-8 flex items-center gap-3">
-              {user.avatar && (
-                <img
-                  src={user.avatar}
-                  alt=""
-                  className="h-10 w-10 rounded-full"
-                />
-              )}
-              <div>
-                <p className="text-sm font-semibold text-popup-text">{user.name ?? '내 페이지'}</p>
-                <p className="text-xs text-popup-muted">{user.email}</p>
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                {user.avatar && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.avatar}
+                    alt=""
+                    className="h-10 w-10 rounded-full"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-popup-text">{user.name ?? '내 페이지'}</p>
+                  <p className="truncate text-xs text-popup-muted">{user.email}</p>
+                </div>
               </div>
+              <button
+                onClick={() => setShowRegister(true)}
+                className="shrink-0 rounded-lg border border-popup-border bg-popup-white px-3 py-2 text-xs font-medium text-popup-text hover:border-popup-text transition-colors"
+              >
+                + 페이지 등록
+              </button>
             </div>
 
             {claimed !== null && claimed > 0 && (
@@ -155,12 +216,20 @@ export default function MyPagesPage() {
             {pages && pages.length === 0 && (
               <div className="rounded-xl border border-popup-border bg-popup-white py-12 text-center">
                 <p className="mb-3 text-sm text-popup-muted">아직 내 페이지가 없어요.</p>
-                <Link
-                  href="/"
-                  className="text-sm text-popup-accent underline-offset-2 hover:underline"
-                >
-                  새 팝업 만들기 →
-                </Link>
+                <div className="flex flex-col items-center gap-2">
+                  <Link
+                    href="/"
+                    className="text-sm text-popup-accent underline-offset-2 hover:underline"
+                  >
+                    새 팝업 만들기 →
+                  </Link>
+                  <button
+                    onClick={() => setShowRegister(true)}
+                    className="text-xs text-popup-muted underline-offset-2 hover:text-popup-text hover:underline"
+                  >
+                    또는 기존 페이지를 PIN으로 등록하기
+                  </button>
+                </div>
               </div>
             )}
 
@@ -262,6 +331,74 @@ export default function MyPagesPage() {
           </>
         )}
       </div>
+
+      {/* ── 페이지 등록 모달 ─────────────────────────────────── */}
+      {showRegister && (
+        <div
+          onClick={closeRegister}
+          className="fixed inset-0 z-[400] flex items-center justify-center bg-black/30 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[380px] rounded-2xl bg-popup-white p-6 shadow-xl"
+          >
+            <p className="mb-1 text-sm font-semibold text-popup-text">기존 페이지 등록</p>
+            <p className="mb-5 text-xs text-popup-muted">
+              내가 만든 페이지의 주소와 PIN을 입력하면 내 계정에 연결돼요.
+            </p>
+
+            <form onSubmit={(e) => void handleRegister(e)}>
+              <label className="mb-1.5 block text-xs font-medium text-popup-muted">페이지 주소</label>
+              <input
+                type="text"
+                value={regUrl}
+                onChange={(e) => setRegUrl(e.target.value)}
+                placeholder="popup2026.com/abc123 또는 abc123"
+                disabled={regLoading}
+                className="mb-3 w-full rounded-lg border border-popup-border bg-popup-white px-3.5 py-2.5 text-sm text-popup-text outline-none transition-colors focus:border-popup-accent disabled:opacity-50"
+                autoFocus
+              />
+
+              <label className="mb-1.5 block text-xs font-medium text-popup-muted">편집 PIN</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                value={regPin}
+                onChange={(e) => setRegPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="4~8자리 숫자"
+                maxLength={8}
+                disabled={regLoading}
+                className="mb-4 w-full rounded-lg border border-popup-border bg-popup-white px-3.5 py-2.5 text-sm tracking-[0.25em] text-popup-text outline-none transition-colors focus:border-popup-accent disabled:opacity-50"
+              />
+
+              {regError && (
+                <p className="mb-3 text-xs text-red-400">{regError}</p>
+              )}
+              {regSuccess && (
+                <p className="mb-3 text-xs text-popup-accent">✓ {regSuccess}</p>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeRegister}
+                  disabled={regLoading}
+                  className="flex-1 rounded-lg border border-popup-border bg-popup-white py-2.5 text-sm text-popup-muted hover:border-popup-text hover:text-popup-text transition-colors disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={regLoading || !regUrl.trim() || regPin.length < 4}
+                  className="flex-1 rounded-lg bg-popup-accent py-2.5 text-sm font-medium text-popup-accent-fg hover:bg-popup-accent-hover transition-colors disabled:opacity-50"
+                >
+                  {regLoading ? '확인 중…' : '등록'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
