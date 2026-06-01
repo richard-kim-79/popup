@@ -56,7 +56,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (data?.html_content) {
     const meta = extractHtmlMeta(data.html_content)
     const title = meta.title?.trim() || 'HTML 페이지'
-    const description = meta.description?.trim() || '30초 만에 웹페이지를 만들고 링크로 공유하세요'
+    const description = meta.description?.trim() || undefined  // 페이지 자체 설명이 없으면 메타 자체 생략
     const pageUrl = `${BASE}/${slug}`
     // og:image 우선순위: HTML이 명시한 절대 URL > 동적 OG 라우트(자동 fallback)
     // 사용자 HTML에 og:image가 없으면 ${BASE}/${slug}/opengraph-image가 자동 생성됨
@@ -64,12 +64,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     return {
       title,
-      description,
+      ...(description ? { description } : {}),
       robots: isLocked ? { index: false, follow: false } : { index: true, follow: true },
       alternates: { canonical: pageUrl },
       openGraph: {
         title,
-        description,
+        ...(description ? { description } : {}),
         url: pageUrl,
         siteName: 'Popup',
         type: 'website',
@@ -78,7 +78,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       twitter: {
         card: 'summary_large_image',
         title,
-        description,
+        ...(description ? { description } : {}),
         ...(images ? { images } : {}),
       },
     }
@@ -91,11 +91,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const rawTitle = titleBlock ? (titleBlock as { content: string }).content.trim() : null
   const title = rawTitle ?? 'Popup 페이지'
 
-  // 첫 번째 text 블록을 설명으로
+  // 첫 번째 text 블록을 설명으로 (없으면 메타 자체에 description 제외)
   const textBlock = blocks.find((b) => b.type === 'text' && (b as { content?: string }).content?.trim())
   const description = textBlock
     ? (textBlock as { content: string }).content.trim().slice(0, 160)
-    : '30초 만에 웹페이지를 만들고 링크로 공유하세요'
+    : undefined
 
   // OG 이미지 우선순위: 이미지 블록 > YouTube 썸네일 > 기본
   const imageBlock = blocks.find((b) => b.type === 'image' && (b as { url?: string }).url && !(b as { url: string }).url.toLowerCase().endsWith('.pdf'))
@@ -112,7 +112,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title,
-    description,
+    ...(description ? { description } : {}),
     // 잠금된 페이지는 검색엔진 색인 제외
     robots: isLocked ? { index: false, follow: false } : { index: true, follow: true },
     alternates: {
@@ -120,7 +120,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     openGraph: {
       title,
-      description,
+      ...(description ? { description } : {}),
       url: pageUrl,
       siteName: 'Popup',
       type: 'article',
@@ -132,7 +132,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     twitter: {
       card: 'summary_large_image',
       title,
-      description,
+      ...(description ? { description } : {}),
       ...(ogImage ? { images: [ogImage] } : {}),
     },
   }
@@ -382,7 +382,7 @@ export default async function ViewerPage({ params }: Props) {
   const textBlock = blocks.find((b) => b.type === 'text' && (b as { content?: string }).content?.trim())
   const pageDesc = textBlock
     ? (textBlock as { content: string }).content.trim().slice(0, 160)
-    : '30초 만에 웹페이지를 만들고 링크로 공유하세요'
+    : undefined
   const imageBlock = blocks.find((b) => b.type === 'image' && (b as { url?: string }).url && !(b as { url: string }).url.toLowerCase().endsWith('.pdf'))
   const ogImage = imageBlock ? (imageBlock as { url: string }).url : undefined
 
@@ -390,7 +390,7 @@ export default async function ViewerPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
     name: pageTitle,
-    description: pageDesc,
+    ...(pageDesc ? { description: pageDesc } : {}),
     url: `${BASE}/${slug}`,
     ...(ogImage ? { image: ogImage } : {}),
     datePublished: data.created_at ?? undefined,

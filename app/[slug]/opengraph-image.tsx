@@ -26,7 +26,7 @@ export default async function PageOgImage({ params }: Props) {
 
   // 제목 추출: HTML 페이지면 <title>/og:title, 블록 페이지면 H1
   let title = 'Popup 페이지'
-  let subtitle = '30초 만에 만들고 링크로 공유'
+  let subtitle = ''  // 페이지 자체 콘텐츠가 있을 때만 채움
 
   if (data?.html_content) {
     const meta = extractHtmlMeta(data.html_content)
@@ -78,18 +78,20 @@ export default async function PageOgImage({ params }: Props) {
           {title}
         </div>
 
-        {/* 부제 */}
-        <div
-          style={{
-            fontSize: 30,
-            color: '#A09D92',
-            lineHeight: 1.4,
-            display: 'flex',
-            maxWidth: 1000,
-          }}
-        >
-          {subtitle}
-        </div>
+        {/* 부제 — 페이지 자체 콘텐츠가 있을 때만 표시 */}
+        {subtitle && (
+          <div
+            style={{
+              fontSize: 30,
+              color: '#A09D92',
+              lineHeight: 1.4,
+              display: 'flex',
+              maxWidth: 1000,
+            }}
+          >
+            {subtitle}
+          </div>
+        )}
       </div>
     ),
     { ...size },
