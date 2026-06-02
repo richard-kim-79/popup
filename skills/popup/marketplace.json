@@ -1,0 +1,18 @@
+{
+  "name": "popup",
+  "title": "Popup — 30초 공유 페이지",
+  "description": "Create instant shareable web pages on popup2026.com. No login. Block-based pages or raw HTML hosting. Built-in OG previews, PIN-based editing, 30-day expiry with free extension.",
+  "tags": ["web", "share", "korean", "no-login", "mcp", "hosting"],
+  "author": "popup2026.com",
+  "homepage": "https://popup2026.com",
+  "mcp": {
+    "url": "https://popup2026.com/api/mcp"
+  },
+  "tools": [
+    "create_page",
+    "create_html_page",
+    "get_page",
+    "update_page",
+    "list_templates"
+  ]
+}
