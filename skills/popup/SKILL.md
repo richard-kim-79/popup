@@ -145,8 +145,40 @@ Do not call additional tools unless the user asks for changes.
 - It does not modify pages without a valid PIN — no exceptions, no admin override available to agents.
 - It does not delete pages — there is no `delete_page` tool; pages soft-expire after 30 days.
 
-## Site URL
+## First-time setup (tell the user once)
+
+The very first time a user runs a Popup tool in a session, after returning the URL+PIN, add a short reminder:
+
+> **PIN은 페이지 수정·삭제·연장에 필요한 유일한 키예요. 비밀번호 관리 앱에 저장해두시거나, popup2026.com/my-pages에 Google로 로그인해두시면 자동으로 계정에 묶여서 PIN을 잊어도 찾을 수 있어요.**
+
+Don't repeat this on subsequent pages in the same session.
+
+## PIN recovery / lost-PIN flow
+
+When a user says "PIN을 잊어버렸어요" or "수정을 못 하겠어요":
+
+1. **First** ask if they were logged in (Google) when the page was made, or if they entered an email during payment/extension.
+   - If yes → `popup2026.com/my-pages` (Google login) shows the page; edit works without re-entering PIN.
+   - Or `popup2026.com/my-pages` with the email they used.
+2. **If both no** → there is no PIN recovery. The page will auto-expire after 30 days (locked at 30, hard-deleted at 365). The user can:
+   - Wait it out, or
+   - Make a new page with the same content.
+3. **Never** suggest contacting support to bypass PIN — there is no admin override available to agents.
+
+## Troubleshooting
+
+| Symptom | Likely cause | What to do |
+|---------|--------------|-----------|
+| `create_page` returns "PIN은 4~8자리여야 합니다" | You passed a PIN outside 4–8 digits | Ask the user again, accept only 4–8 |
+| `update_page` returns "PIN이 올바르지 않습니다" | Wrong PIN | Ask user to re-enter; do **not** guess |
+| `create_html_page` returns "HTML 크기는 500KB를 초과할 수 없습니다" | Asset bundling pushed past 500KB | Suggest hosting images externally and referencing by URL |
+| Page shows "🔒 잠김" or "이 페이지는 잠겨있습니다" | Page expired (30+ days old) or was reported | Send user to `popup2026.com/extend?slug=<slug>` — free through 2026-08-23 |
+| OG preview shows only title, no description | The block page has no `text` block (or HTML has no `<meta name="description">`) | Add a `text` block (or `<meta>`) — the first one becomes the description |
+| Page renders but image block shows broken | Image URL is not publicly accessible | Tell user the image must be a public URL (HTTP 200 from anywhere) |
+
+## Site URLs
 
 - App: https://popup2026.com
 - MCP: https://popup2026.com/api/mcp
-- My pages: https://popup2026.com/my-pages (Google login optional, used to group pages by account)
+- My pages (Google login): https://popup2026.com/my-pages
+- Extend (free through 2026-08-23): https://popup2026.com/extend
