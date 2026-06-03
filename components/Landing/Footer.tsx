@@ -5,7 +5,7 @@ export default function Footer() {
     <footer className="border-t border-popup-border bg-popup-bg px-6 py-10 text-center">
 
       {/* 정책 링크 */}
-      <div className="mb-6 flex items-center justify-center gap-5 text-[13px] text-popup-muted">
+      <div className="mb-3 flex items-center justify-center gap-5 text-[13px] text-popup-muted">
         <Link href="/privacy" className="hover:text-popup-text transition-colors">
           개인정보처리방침
         </Link>
@@ -13,6 +13,29 @@ export default function Footer() {
         <Link href="/terms" className="hover:text-popup-text transition-colors">
           이용약관
         </Link>
+      </div>
+
+      {/* 개발자 · AI 에이전트 */}
+      <div className="mb-6 flex items-center justify-center gap-3 text-[12px] text-popup-faint">
+        <a
+          href="https://popup2026.com/api/mcp"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-popup-muted transition-colors"
+          title="Popup MCP 서버 (Claude.ai 통합)"
+        >
+          MCP 서버
+        </a>
+        <span className="text-popup-faint/50">·</span>
+        <a
+          href="https://github.com/richard-kim-79/popup-skills"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-popup-muted transition-colors"
+          title="Claude Code · Cursor · Codex · Gemini에서 사용하기"
+        >
+          AI 에이전트에서 사용하기
+        </a>
       </div>
 
       {/* 사업자 정보 */}
