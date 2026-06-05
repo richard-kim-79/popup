@@ -2,9 +2,16 @@ import Link from 'next/link'
 import { getSupabaseServer } from '@/lib/supabase-server'
 
 export default async function Nav() {
-  const supabase = await getSupabaseServer()
-  const { data } = await supabase.auth.getUser()
-  const user = data.user
+  // 인증 조회 실패 시(쿠키 손상·네트워크·Supabase 장애 등)에도 페이지가 깨지지 않도록
+  // try/catch로 격리. 실패 시 비로그인 상태로 렌더링.
+  let user: { user_metadata?: { avatar_url?: string } } | null = null
+  try {
+    const supabase = await getSupabaseServer()
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    // 비로그인 상태로 fallback — RSC 에러로 전체 페이지가 깨지는 것 방지
+  }
   const avatar = (user?.user_metadata?.avatar_url as string | undefined) ?? null
 
   return (
