@@ -1,16 +1,30 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { getSupabaseBrowser } from '@/lib/supabase'
+import PreviewCard from '@/components/MyPages/PreviewCard'
 
 interface Page {
   slug: string
   title: string
   expires_at: string
+  created_at?: string
   is_html?: boolean
   locked?: boolean
 }
+
+type SortKey = 'recent' | 'expiring' | 'title' | 'locked-first'
+
+const SORT_LABELS: Record<SortKey, string> = {
+  recent: '최신순',
+  expiring: '만료 임박순',
+  title: '제목순',
+  'locked-first': '잠금 먼저',
+}
+
+const SORT_STORAGE_KEY = 'popup_my_pages_sort'
+const HOVER_DELAY_MS = 300
 
 interface SessionUser {
   email: string | null
@@ -26,6 +40,20 @@ export default function MyPagesPage() {
   const [email, setEmail] = useState('')
   const [searchLoading, setSearchLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // 정렬
+  const [sortKey, setSortKey] = useState<SortKey>('recent')
+
+  // 호버 미리보기
+  const [hoverPreview, setHoverPreview] = useState<{
+    slug: string
+    title: string
+    daysLeft: number
+    locked: boolean
+    anchor: { top: number; left: number; right: number; bottom: number }
+  } | null>(null)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const supportsHoverRef = useRef<boolean>(true)
 
   // 페이지 등록 모달
   const [showRegister, setShowRegister] = useState(false)
@@ -170,6 +198,62 @@ export default function MyPagesPage() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24))
   }
 
+  // ── 정렬: localStorage 복원 ───────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = localStorage.getItem(SORT_STORAGE_KEY) as SortKey | null
+    if (stored && stored in SORT_LABELS) setSortKey(stored)
+    // 터치 디바이스 감지
+    supportsHoverRef.current = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  }, [])
+
+  const handleSortChange = (next: SortKey) => {
+    setSortKey(next)
+    if (typeof window !== 'undefined') localStorage.setItem(SORT_STORAGE_KEY, next)
+  }
+
+  // ── 정렬 적용 (메모이즈) ─────────────────────────────────────
+  const sortedPages = useMemo(() => {
+    if (!pages) return null
+    const arr = [...pages]
+    switch (sortKey) {
+      case 'recent':
+        return arr.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+      case 'expiring':
+        return arr.sort((a, b) => new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime())
+      case 'title':
+        return arr.sort((a, b) => a.title.localeCompare(b.title, 'ko'))
+      case 'locked-first':
+        return arr.sort((a, b) => {
+          const aLocked = !!a.locked || daysLeft(a.expires_at) <= 0
+          const bLocked = !!b.locked || daysLeft(b.expires_at) <= 0
+          if (aLocked !== bLocked) return aLocked ? -1 : 1
+          return new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime()
+        })
+    }
+  }, [pages, sortKey])
+
+  // ── 호버 미리보기 핸들러 ─────────────────────────────────────
+  const handleHoverEnter = (e: React.MouseEvent<HTMLDivElement>, p: Page) => {
+    if (!supportsHoverRef.current) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const anchor = { top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom }
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = setTimeout(() => {
+      setHoverPreview({
+        slug: p.slug,
+        title: p.title,
+        daysLeft: daysLeft(p.expires_at),
+        locked: !!p.locked || daysLeft(p.expires_at) <= 0,
+        anchor,
+      })
+    }, HOVER_DELAY_MS)
+  }
+  const handleHoverLeave = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    setHoverPreview(null)
+  }
+
   const handleSignOut = async () => {
     await fetch('/api/auth/sign-out', { method: 'POST' })
     window.location.href = '/'
@@ -216,12 +300,27 @@ export default function MyPagesPage() {
                   <p className="truncate text-xs text-popup-muted">{user.email}</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowRegister(true)}
-                className="shrink-0 rounded-lg border border-popup-border bg-popup-white px-3 py-2 text-xs font-medium text-popup-text hover:border-popup-text transition-colors"
-              >
-                + 페이지 등록
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {pages && pages.length > 1 && (
+                  <select
+                    value={sortKey}
+                    onChange={(e) => handleSortChange(e.target.value as SortKey)}
+                    aria-label="정렬 기준"
+                    title="정렬"
+                    className="rounded-lg border border-popup-border bg-popup-white px-2.5 py-2 text-xs text-popup-text hover:border-popup-text transition-colors focus:outline-none focus:border-popup-accent"
+                  >
+                    {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                      <option key={k} value={k}>{SORT_LABELS[k]}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={() => setShowRegister(true)}
+                  className="rounded-lg border border-popup-border bg-popup-white px-3 py-2 text-xs font-medium text-popup-text hover:border-popup-text transition-colors"
+                >
+                  + 페이지 등록
+                </button>
+              </div>
             </div>
 
             {claimed !== null && claimed > 0 && (
@@ -250,13 +349,18 @@ export default function MyPagesPage() {
               </div>
             )}
 
-            {pages && pages.length > 0 && (
+            {sortedPages && sortedPages.length > 0 && (
               <div className="flex flex-col gap-3">
-                {pages.map((p) => {
+                {sortedPages.map((p) => {
                   const left = daysLeft(p.expires_at)
                   const isLocked = !!p.locked || left <= 0
                   return (
-                    <div key={p.slug} className="flex items-center justify-between rounded-xl border border-popup-border bg-popup-white px-5 py-4">
+                    <div
+                      key={p.slug}
+                      onMouseEnter={(e) => handleHoverEnter(e, p)}
+                      onMouseLeave={handleHoverLeave}
+                      className="flex items-center justify-between rounded-xl border border-popup-border bg-popup-white px-5 py-4 transition-colors hover:border-popup-text/30"
+                    >
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <p className="truncate text-sm font-medium text-popup-text">{p.title}</p>
@@ -363,6 +467,18 @@ export default function MyPagesPage() {
           </>
         )}
       </div>
+
+      {/* ── 호버 미리보기 카드 ──────────────────────────────── */}
+      {hoverPreview && (
+        <PreviewCard
+          key={hoverPreview.slug}
+          slug={hoverPreview.slug}
+          title={hoverPreview.title}
+          daysLeft={hoverPreview.daysLeft}
+          locked={hoverPreview.locked}
+          anchor={hoverPreview.anchor}
+        />
+      )}
 
       {/* ── 페이지 등록 모달 ─────────────────────────────────── */}
       {showRegister && (

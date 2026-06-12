@@ -5,6 +5,7 @@ interface PageResult {
   slug: string
   title: string
   expires_at: string
+  created_at: string
   is_html: boolean
   locked: boolean
 }
@@ -26,7 +27,7 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
   // 1) user_id 직접 소유
   const { data: owned } = await supabase
     .from('pages')
-    .select('slug, blocks, expires_at, html_content, locked, deleted_at')
+    .select('slug, blocks, expires_at, created_at, html_content, locked, deleted_at')
     .eq('user_id', user.id)
     .is('deleted_at', null)
 
@@ -34,14 +35,14 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
   const { data: linked } = email
     ? await supabase
         .from('page_emails')
-        .select('pages(slug, blocks, expires_at, html_content, locked, deleted_at)')
+        .select('pages(slug, blocks, expires_at, created_at, html_content, locked, deleted_at)')
         .eq('email', email)
-    : { data: [] as Array<{ pages: { slug: string; blocks: unknown; expires_at: string; html_content: string | null; locked: boolean; deleted_at: string | null } | null }> }
+    : { data: [] as Array<{ pages: { slug: string; blocks: unknown; expires_at: string; created_at: string; html_content: string | null; locked: boolean; deleted_at: string | null } | null }> }
 
   const seen = new Set<string>()
   const pages: PageResult[] = []
 
-  const pushPage = (row: { slug: string; blocks: unknown; expires_at: string; html_content: string | null; locked: boolean; deleted_at: string | null } | null) => {
+  const pushPage = (row: { slug: string; blocks: unknown; expires_at: string; created_at: string; html_content: string | null; locked: boolean; deleted_at: string | null } | null) => {
     if (!row || row.deleted_at || seen.has(row.slug)) return
     seen.add(row.slug)
     const blocks = (row.blocks ?? []) as Block[]
@@ -51,6 +52,7 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
       slug: row.slug,
       title,
       expires_at: row.expires_at,
+      created_at: row.created_at,
       is_html: !!row.html_content,
       locked: row.locked,
     })
@@ -59,8 +61,8 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
   ;(owned ?? []).forEach(pushPage)
   ;(linked ?? []).forEach((r) => pushPage(r.pages))
 
-  // 만료일 가까운 순으로 정렬
-  pages.sort((a, b) => new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime())
+  // 기본 정렬: 최신 등록 순 (클라이언트가 다시 정렬 가능)
+  pages.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
 
   return NextResponse.json({ pages })
 }
