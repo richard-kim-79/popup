@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { getSupabaseBrowser } from '@/lib/supabase'
 import PreviewCard from '@/components/MyPages/PreviewCard'
 
@@ -46,6 +47,7 @@ interface SessionUser {
 }
 
 export default function MyPagesPage() {
+  const router = useRouter()
   const [user, setUser] = useState<SessionUser | null>(null)
   const [pages, setPages] = useState<Page[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -272,7 +274,7 @@ export default function MyPagesPage() {
   }, [pages, sortKey, tab])
 
   // ── 호버 미리보기 핸들러 ─────────────────────────────────────
-  const handleHoverEnter = (e: React.MouseEvent<HTMLDivElement>, p: Page) => {
+  const handleHoverEnter = (e: React.MouseEvent<HTMLElement>, p: Page) => {
     if (!supportsHoverRef.current) return
     const rect = e.currentTarget.getBoundingClientRect()
     const anchor = { top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom }
@@ -431,15 +433,19 @@ export default function MyPagesPage() {
                   const left = daysLeft(p.expires_at)
                   const isLocked = !!p.locked || left <= 0
                   return (
-                    <div
+                    <a
                       key={p.slug}
+                      href={`/${p.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onMouseEnter={(e) => handleHoverEnter(e, p)}
                       onMouseLeave={handleHoverLeave}
-                      className="flex items-center justify-between rounded-xl border border-popup-border bg-popup-white px-5 py-4 transition-colors hover:border-popup-text/30"
+                      aria-label={`${p.title} 페이지 새 창에서 보기`}
+                      className="group flex cursor-pointer items-center justify-between rounded-xl border border-popup-border bg-popup-white px-5 py-4 transition-colors hover:border-popup-accent/40 hover:shadow-sm"
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className="truncate text-sm font-medium text-popup-text">{p.title}</p>
+                          <p className="truncate text-sm font-medium text-popup-text group-hover:text-popup-accent transition-colors">{p.title}</p>
                           {p.is_html && (
                             <span className="rounded bg-popup-surface px-1.5 py-0.5 text-[10px] text-popup-muted">HTML</span>
                           )}
@@ -453,20 +459,22 @@ export default function MyPagesPage() {
                           {left > 0 ? `${left}일 남음` : '만료됨'}
                         </p>
                       </div>
+                      {/* 우측 액션 — <a> 안에 또 다른 <a>(Link)를 두면 nested anchor가 되어 HTML 사양 위반.
+                          버튼으로 만들고 stopPropagation + preventDefault + router.push로 분기 */}
                       <div className="ml-4 flex shrink-0 gap-2">
-                        <Link href={`/${p.slug}`} className="rounded-md px-3 py-1.5 text-xs text-popup-muted hover:bg-popup-surface">보기</Link>
-                        {isLocked ? (
-                          <Link
-                            href={`/extend?slug=${p.slug}`}
-                            className="rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover"
-                          >
-                            연장하기
-                          </Link>
-                        ) : (
-                          <Link href={`/${p.slug}/edit`} className="rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover">편집</Link>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            router.push(isLocked ? `/extend?slug=${p.slug}` : `/${p.slug}/edit`)
+                          }}
+                          className="rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover"
+                        >
+                          {isLocked ? '연장하기' : '편집'}
+                        </button>
                       </div>
-                    </div>
+                    </a>
                   )
                 })}
               </div>
