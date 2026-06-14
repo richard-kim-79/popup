@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServer, getSupabaseAdmin } from '@/lib/supabase-server'
 import { verifyPin } from '@/lib/pin'
+import { extractHtmlMeta } from '@/lib/html-meta'
 import type { Block, ApiError } from '@/types'
 
 interface Body {
@@ -100,7 +101,13 @@ export async function POST(
 }
 
 function extractTitle(page: { blocks: unknown; html_content: string | null; slug: string }): string {
-  if (page.html_content) return 'HTML 페이지'
+  // HTML 페이지 — og:title > <title> > 'HTML 페이지' fallback
+  if (page.html_content) {
+    const meta = extractHtmlMeta(page.html_content)
+    if (meta.title) return meta.title.slice(0, 80)
+    return 'HTML 페이지'
+  }
+  // 블록 페이지 — 첫 H1 블록 > slug fallback
   const blocks = (page.blocks ?? []) as Block[]
   const h1 = blocks.find((b) => b.type === 'h1' && (b as { content?: string }).content?.trim())
   return h1 ? (h1 as { content: string }).content.trim() : page.slug

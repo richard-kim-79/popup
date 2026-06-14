@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseServer, getSupabaseAdmin } from '@/lib/supabase-server'
+import { extractHtmlMeta } from '@/lib/html-meta'
 
 interface PageResult {
   slug: string
@@ -45,9 +46,16 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
   const pushPage = (row: { slug: string; blocks: unknown; expires_at: string; created_at: string; html_content: string | null; locked: boolean; deleted_at: string | null } | null) => {
     if (!row || row.deleted_at || seen.has(row.slug)) return
     seen.add(row.slug)
-    const blocks = (row.blocks ?? []) as Block[]
-    const titleBlock = blocks.find((b) => b.type === 'h1' && b.content?.trim())
-    const title = titleBlock?.content?.trim() ?? (row.html_content ? 'HTML 페이지' : row.slug)
+    // 제목 추출: HTML 페이지면 <title>/og:title 우선, 블록 페이지면 첫 H1
+    let title: string
+    if (row.html_content) {
+      const meta = extractHtmlMeta(row.html_content)
+      title = meta.title?.slice(0, 80) ?? 'HTML 페이지'
+    } else {
+      const blocks = (row.blocks ?? []) as Block[]
+      const titleBlock = blocks.find((b) => b.type === 'h1' && b.content?.trim())
+      title = titleBlock?.content?.trim() ?? row.slug
+    }
     pages.push({
       slug: row.slug,
       title,
