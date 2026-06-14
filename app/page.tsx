@@ -114,13 +114,10 @@ export default function LandingPage() {
 
       {/* 히어로 */}
       <div className="flex flex-1 flex-col items-center justify-center px-6 pb-40 pt-64 text-center">
-        <h1 className="mb-4 max-w-md text-[1.75rem] font-bold leading-[1.18] tracking-[-0.04em] text-popup-text sm:text-[2.6rem]">
-          링크 하나로<br />
-          웹페이지를 공유해요
+        <h1 className="mb-10 max-w-md text-[1.75rem] font-bold leading-[1.18] tracking-[-0.04em] text-popup-text sm:text-[2.6rem]">
+          로그인 없이<br />
+          웹페이지 만들고 공유
         </h1>
-        <p className="mb-10 text-base text-popup-muted">
-          로그인 없이 &nbsp;·&nbsp; 30일 무료 &nbsp;·&nbsp; PIN 보호
-        </p>
         <LandingClient />
       </div>
 
