@@ -8,6 +8,7 @@ import BlockAdder from './BlockAdder'
 import LockBanner from './LockBanner'
 import ShareModal from '@/components/Modal/ShareModal'
 import UpgradeModal from '@/components/Modal/UpgradeModal'
+import ExpireNowModal from '@/components/Modal/ExpireNowModal'
 import type { Block, BlockType } from '@/types'
 
 const ACCEPTED_MIME = new Set([
@@ -34,6 +35,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const [showBanner, setShowBanner] = useState(daysLeft <= 7 && !locked)
   const [showShare, setShowShare] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [showExpire, setShowExpire] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
 
@@ -413,6 +415,19 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
               잠금 해제
             </button>
           )}
+          {!locked && (
+            <button
+              onClick={() => setShowExpire(true)}
+              title="지금 만료시키기"
+              aria-label="지금 만료시키기"
+              className="rounded-md p-1.5 text-popup-muted hover:bg-popup-warn-bg hover:text-popup-warn transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => setShowShare(true)}
             className="rounded-lg bg-popup-accent px-3.5 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover"
@@ -472,6 +487,17 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
 
       {showShare   && <ShareModal   slug={slug} onClose={() => setShowShare(false)}   />}
       {showUpgrade && <UpgradeModal slug={slug} onClose={() => setShowUpgrade(false)} />}
+      {showExpire && (
+        <ExpireNowModal
+          slug={slug}
+          editToken={editToken}
+          onClose={() => setShowExpire(false)}
+          onExpired={() => {
+            // 만료 처리 후 my-pages로 이동 (편집 권한이 사라졌으니 자연스러운 동선)
+            if (typeof window !== 'undefined') window.location.href = '/my-pages'
+          }}
+        />
+      )}
     </div>
   )
 }

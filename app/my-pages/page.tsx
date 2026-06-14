@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getSupabaseBrowser } from '@/lib/supabase'
 import PreviewCard from '@/components/MyPages/PreviewCard'
+import ExpireNowModal from '@/components/Modal/ExpireNowModal'
 
 interface Page {
   slug: string
@@ -61,6 +62,9 @@ export default function MyPagesPage() {
 
   // 탭
   const [tab, setTab] = useState<TabKey>('active')
+
+  // "지금 만료" 모달 — 어떤 slug에 대해 띄울지
+  const [expireSlug, setExpireSlug] = useState<string | null>(null)
 
   // 호버 미리보기
   const [hoverPreview, setHoverPreview] = useState<{
@@ -461,7 +465,25 @@ export default function MyPagesPage() {
                       </div>
                       {/* 우측 액션 — <a> 안에 또 다른 <a>(Link)를 두면 nested anchor가 되어 HTML 사양 위반.
                           버튼으로 만들고 stopPropagation + preventDefault + router.push로 분기 */}
-                      <div className="ml-4 flex shrink-0 gap-2">
+                      <div className="ml-4 flex shrink-0 items-center gap-1.5">
+                        {!isLocked && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              setExpireSlug(p.slug)
+                            }}
+                            title="지금 만료시키기"
+                            aria-label={`${p.title} 지금 만료시키기`}
+                            className="rounded-md p-1.5 text-popup-muted hover:bg-popup-warn-bg hover:text-popup-warn transition-colors"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="9" />
+                              <path d="M12 7v5l3 2" />
+                            </svg>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -561,6 +583,19 @@ export default function MyPagesPage() {
           daysLeft={hoverPreview.daysLeft}
           locked={hoverPreview.locked}
           anchor={hoverPreview.anchor}
+        />
+      )}
+
+      {/* ── 지금 만료 모달 ───────────────────────────────────── */}
+      {expireSlug && (
+        <ExpireNowModal
+          slug={expireSlug}
+          editToken={typeof window !== 'undefined' ? localStorage.getItem(`popup_token_${expireSlug}`) : null}
+          onClose={() => setExpireSlug(null)}
+          onExpired={() => {
+            setExpireSlug(null)
+            void loadMine()  // 카드를 활성 탭에서 만료 탭으로 즉시 반영
+          }}
         />
       )}
 

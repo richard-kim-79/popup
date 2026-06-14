@@ -8,6 +8,7 @@ import { extractHtmlMeta } from '@/lib/html-meta'
 import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
 import SocialEmbed from '@/components/Blocks/SocialEmbed'
 import ExpiryUpgradeButton from '@/components/Viewer/ExpiryUpgradeButton'
+import ExpireNowButton from '@/components/Viewer/ExpireNowButton'
 import LockedBanner from '@/components/Viewer/LockedBanner'
 
 /** URL에서 hostname 안전하게 추출 */
@@ -473,6 +474,8 @@ export default async function ViewerPage({ params }: Props) {
               <ExpiryUpgradeButton slug={slug} remaining={remaining} />
               <span className="text-popup-faint">·</span>
               <ReportButton slug={slug} />
+              {/* 소유자(localStorage 토큰 보유)에게만 노출 */}
+              <ExpireNowButton slug={slug} />
             </>
           )}
         </div>
