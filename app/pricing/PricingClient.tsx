@@ -119,7 +119,7 @@ export default function PricingClient() {
       <div className="mb-2 text-center">
         <h1 className="text-2xl font-bold text-popup-text sm:text-3xl">요금제</h1>
         <p className="mt-2 text-sm text-popup-muted">
-          페이지 만료 면제, 더 큰 저장 용량, 더 많은 페이지
+          필요한 만큼 저장 용량을 선택하세요
         </p>
       </div>
 
@@ -185,10 +185,6 @@ export default function PricingClient() {
               <ul className="mb-6 space-y-2 text-xs text-popup-text">
                 <li>💾 저장 용량 {formatBytes(t.storageBytes)}</li>
                 <li>📄 페이지 {t.pageLimit === -1 ? '무제한' : `${t.pageLimit}개`}</li>
-                <li>{t.expiresPages ? '🔒 30일 만료 적용' : '✨ 페이지 만료 면제'}</li>
-                {t.customDomain && <li>🌐 커스텀 도메인</li>}
-                {tier !== 'free' && <li>🚫 광고 제거</li>}
-                {tier === 'pro' && <li>⚡ 우선 지원 · MCP API rate 상향</li>}
               </ul>
 
               {isFree ? (
