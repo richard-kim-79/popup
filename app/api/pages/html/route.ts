@@ -3,6 +3,7 @@ import { getSupabaseAdmin, getSupabaseServer } from '@/lib/supabase-server'
 import { hashPin } from '@/lib/pin'
 import { issueEditToken } from '@/lib/token'
 import { generateUniqueSlug } from '@/lib/slug'
+import { checkStorageQuota } from '@/lib/subscription'
 import type { CreatePageResponse, ApiError } from '@/types'
 
 const MAX_HTML_BYTES = 500_000 // 500 KB
@@ -34,6 +35,17 @@ export async function POST(
   const userId = userData?.user?.id ?? null
 
   const supabase = getSupabaseAdmin()
+
+  // 로그인 사용자: 티어별 저장 용량 한도 사전 체크
+  const newBytes = Buffer.byteLength(body.html, 'utf8')
+  const quota = await checkStorageQuota(supabase, userId, newBytes)
+  if (quota && !quota.allowed) {
+    return NextResponse.json(
+      { error: quota.reason ?? '저장 용량을 초과했습니다.' },
+      { status: 413 },
+    )
+  }
+
   const slug = await generateUniqueSlug()
   const pin_hash = await hashPin(body.pin)
 

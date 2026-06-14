@@ -7,6 +7,7 @@ import { getSupabaseBrowser } from '@/lib/supabase'
 import PreviewCard from '@/components/MyPages/PreviewCard'
 import ExpireNowModal from '@/components/Modal/ExpireNowModal'
 import SubscriptionStatus from '@/components/MyPages/SubscriptionStatus'
+import UsageCard from '@/components/MyPages/UsageCard'
 
 interface Page {
   slug: string
@@ -376,6 +377,9 @@ export default function MyPagesPage() {
 
             {/* ── 구독 상태 ──────────────────────────────────── */}
             <SubscriptionStatus />
+
+            {/* ── 저장 용량 사용량 + 상향 추천 ─────────────────── */}
+            <UsageCard />
 
             {/* ── 탭 ───────────────────────────────────────────── */}
             {pages && pages.length > 0 && (

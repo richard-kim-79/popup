@@ -27,7 +27,7 @@ export const TIERS: Record<Tier, TierLimits> = {
   free: {
     name: 'Free',
     storageBytes: 50 * MB,
-    pageLimit: 10,
+    pageLimit: -1,        // 페이지 수 무제한 — 용량으로만 제한
     expiresPages: true,
     customDomain: false,
     priceMonthly: 0,
@@ -36,7 +36,7 @@ export const TIERS: Record<Tier, TierLimits> = {
   lite: {
     name: 'Lite',
     storageBytes: 1 * GB,
-    pageLimit: 50,
+    pageLimit: -1,
     expiresPages: false,
     customDomain: false,
     priceMonthly: 3900,
@@ -51,6 +51,16 @@ export const TIERS: Record<Tier, TierLimits> = {
     priceMonthly: 9900,
     priceYearly: 99000,
   },
+}
+
+/** 80% 도달 시 상향 추천 임계값 */
+export const UPGRADE_RECOMMEND_THRESHOLD = 0.8
+
+/** 다음 상향 티어 — Free → Lite, Lite → Pro, Pro → null */
+export function nextTier(tier: Tier): Tier | null {
+  if (tier === 'free') return 'lite'
+  if (tier === 'lite') return 'pro'
+  return null
 }
 
 export function priceFor(tier: Tier, cycle: BillingCycle): number {
