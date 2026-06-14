@@ -86,9 +86,11 @@ export default function PricingClient() {
       const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin).replace(/\/$/, '')
       const customerKey = customerKeyFor(user.id)
 
-      // BillingAuth 요청 → 카드 등록 → 성공 시 successUrl로 redirect (authKey + customerKey 쿼리)
-      await toss.requestBillingAuth('CARD', {
-        customerKey,
+      // 토스 SDK v2 (/v2/standard): payment(customerKey).requestBillingAuth(options) 형태
+      // v1의 `tossPayments.requestBillingAuth('CARD', ...)`은 v2에선 동작 안 함.
+      const payment = toss.payment({ customerKey })
+      await payment.requestBillingAuth({
+        method: 'CARD',
         successUrl: `${baseUrl}/pricing/success?tier=${tier}&cycle=${cycle}`,
         failUrl: `${baseUrl}/pricing/fail`,
         customerEmail: user.email ?? undefined,
