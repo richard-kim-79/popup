@@ -4,8 +4,10 @@
 
 const TOSS_BASE = 'https://api.tosspayments.com/v1'
 
+// 자동결제(빌링)는 별도 MID — TOSS_BILLING_SECRET_KEY 사용
+// 일반 결제(/extend, UpgradeModal)는 기존 TOSS_SECRET_KEY 유지
 function authHeader(): string {
-  const key = (process.env.TOSS_SECRET_KEY ?? '').trim()
+  const key = (process.env.TOSS_BILLING_SECRET_KEY ?? process.env.TOSS_SECRET_KEY ?? '').trim()
   return 'Basic ' + Buffer.from(`${key}:`).toString('base64')
 }
 

@@ -75,7 +75,12 @@ export default function PricingClient() {
 
     try {
       const TossPayments = await waitForSdk()
-      const clientKey = (process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? '').trim()
+      // 자동결제는 별도 MID — NEXT_PUBLIC_TOSS_BILLING_CLIENT_KEY 우선
+      const clientKey = (
+        process.env.NEXT_PUBLIC_TOSS_BILLING_CLIENT_KEY ??
+        process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ??
+        ''
+      ).trim()
       const toss = TossPayments(clientKey)
 
       const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin).replace(/\/$/, '')

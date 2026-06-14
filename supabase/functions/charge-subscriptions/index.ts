@@ -17,7 +17,8 @@ const PRICE: Record<string, Record<string, number>> = {
 }
 
 function authHeader(): string {
-  const key = Deno.env.get('TOSS_SECRET_KEY') ?? ''
+  // 자동결제는 별도 MID — TOSS_BILLING_SECRET_KEY 우선
+  const key = Deno.env.get('TOSS_BILLING_SECRET_KEY') ?? Deno.env.get('TOSS_SECRET_KEY') ?? ''
   return 'Basic ' + btoa(`${key}:`)
 }
 
