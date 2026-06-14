@@ -23,8 +23,21 @@ const SORT_LABELS: Record<SortKey, string> = {
   'locked-first': '잠금 먼저',
 }
 
+type TabKey = 'active' | 'expired'
+const TAB_LABELS: Record<TabKey, string> = {
+  active: '활성',
+  expired: '만료',
+}
+
 const SORT_STORAGE_KEY = 'popup_my_pages_sort'
+const TAB_STORAGE_KEY = 'popup_my_pages_tab'
 const HOVER_DELAY_MS = 300
+
+function isPageActive(p: Page): boolean {
+  if (p.locked) return false
+  const diff = new Date(p.expires_at).getTime() - Date.now()
+  return diff > 0
+}
 
 interface SessionUser {
   email: string | null
@@ -43,6 +56,9 @@ export default function MyPagesPage() {
 
   // 정렬
   const [sortKey, setSortKey] = useState<SortKey>('recent')
+
+  // 탭
+  const [tab, setTab] = useState<TabKey>('active')
 
   // 호버 미리보기
   const [hoverPreview, setHoverPreview] = useState<{
@@ -198,11 +214,13 @@ export default function MyPagesPage() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24))
   }
 
-  // ── 정렬: localStorage 복원 ───────────────────────────────────
+  // ── 정렬·탭: localStorage 복원 ────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const stored = localStorage.getItem(SORT_STORAGE_KEY) as SortKey | null
-    if (stored && stored in SORT_LABELS) setSortKey(stored)
+    const storedSort = localStorage.getItem(SORT_STORAGE_KEY) as SortKey | null
+    if (storedSort && storedSort in SORT_LABELS) setSortKey(storedSort)
+    const storedTab = localStorage.getItem(TAB_STORAGE_KEY) as TabKey | null
+    if (storedTab && storedTab in TAB_LABELS) setTab(storedTab)
     // 터치 디바이스 감지
     supportsHoverRef.current = window.matchMedia('(hover: hover) and (pointer: fine)').matches
   }, [])
@@ -212,10 +230,30 @@ export default function MyPagesPage() {
     if (typeof window !== 'undefined') localStorage.setItem(SORT_STORAGE_KEY, next)
   }
 
-  // ── 정렬 적용 (메모이즈) ─────────────────────────────────────
+  const handleTabChange = (next: TabKey) => {
+    setTab(next)
+    if (typeof window !== 'undefined') localStorage.setItem(TAB_STORAGE_KEY, next)
+  }
+
+  // 탭별 카운트
+  const tabCounts = useMemo(() => {
+    if (!pages) return { active: 0, expired: 0 }
+    return pages.reduce(
+      (acc, p) => {
+        if (isPageActive(p)) acc.active++
+        else acc.expired++
+        return acc
+      },
+      { active: 0, expired: 0 },
+    )
+  }, [pages])
+
+  // ── 정렬 + 탭 필터 적용 (메모이즈) ───────────────────────────
   const sortedPages = useMemo(() => {
     if (!pages) return null
-    const arr = [...pages]
+    // 탭 필터: 활성/만료
+    const filtered = pages.filter((p) => (tab === 'active' ? isPageActive(p) : !isPageActive(p)))
+    const arr = [...filtered]
     switch (sortKey) {
       case 'recent':
         return arr.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
@@ -231,7 +269,7 @@ export default function MyPagesPage() {
           return new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime()
         })
     }
-  }, [pages, sortKey])
+  }, [pages, sortKey, tab])
 
   // ── 호버 미리보기 핸들러 ─────────────────────────────────────
   const handleHoverEnter = (e: React.MouseEvent<HTMLDivElement>, p: Page) => {
@@ -329,6 +367,35 @@ export default function MyPagesPage() {
               </div>
             )}
 
+            {/* ── 탭 ───────────────────────────────────────────── */}
+            {pages && pages.length > 0 && (
+              <div role="tablist" aria-label="페이지 상태" className="mb-4 flex items-center gap-1 border-b border-popup-border">
+                {(Object.keys(TAB_LABELS) as TabKey[]).map((k) => {
+                  const active = tab === k
+                  const count = tabCounts[k]
+                  return (
+                    <button
+                      key={k}
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => handleTabChange(k)}
+                      className={`relative px-4 py-2.5 text-sm transition-colors ${
+                        active
+                          ? 'font-semibold text-popup-text after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-[2px] after:bg-popup-accent'
+                          : 'text-popup-muted hover:text-popup-text'
+                      }`}
+                    >
+                      {TAB_LABELS[k]}
+                      <span className={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] ${active ? 'bg-popup-accent-bg text-popup-accent' : 'bg-popup-surface text-popup-muted'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* ── 전체 비어있음 ───────────────────────────────── */}
             {pages && pages.length === 0 && (
               <div className="rounded-xl border border-popup-border bg-popup-white py-12 text-center">
                 <p className="mb-3 text-sm text-popup-muted">아직 내 페이지가 없어요.</p>
@@ -346,6 +413,15 @@ export default function MyPagesPage() {
                     또는 기존 페이지를 PIN으로 등록하기
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* ── 탭은 있는데 해당 탭만 비어있음 ─────────────── */}
+            {pages && pages.length > 0 && sortedPages && sortedPages.length === 0 && (
+              <div className="rounded-xl border border-popup-border bg-popup-white py-12 text-center">
+                <p className="text-sm text-popup-muted">
+                  {tab === 'active' ? '활성 상태인 페이지가 없어요.' : '만료된 페이지가 없어요.'}
+                </p>
               </div>
             )}
 

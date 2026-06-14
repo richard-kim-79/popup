@@ -354,13 +354,24 @@ export default async function ViewerPage({ params }: Props) {
   if (isHtmlPage) {
     if (isLocked) {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-popup-white text-center px-6">
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-popup-bg text-center px-6">
           <div className="text-4xl">🔒</div>
-          <p className="text-lg font-semibold text-popup-text">페이지 사용 기간이 만료되었습니다</p>
-          <p className="text-sm text-popup-muted">30일 무료 기간이 종료되어 콘텐츠가 잠겼습니다.</p>
-          <a href={`/${slug}/edit`} className="rounded-lg bg-popup-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-popup-accent-hover">
-            잠금 해제하기
-          </a>
+          <p className="text-lg font-semibold text-popup-text">이 페이지의 수명이 다했어요</p>
+          <p className="max-w-sm text-sm text-popup-muted">
+            30일 수명이 끝나 콘텐츠가 비공개로 전환됐어요.<br />
+            연장하면 다시 볼 수 있어요.
+          </p>
+          <div className="mt-2 flex flex-col items-center gap-2">
+            <Link
+              href={`/extend?slug=${slug}`}
+              className="rounded-lg bg-popup-accent px-6 py-2.5 text-sm font-semibold text-popup-accent-fg hover:bg-popup-accent-hover"
+            >
+              연장하기 →
+            </Link>
+            <Link href="/" className="text-xs text-popup-faint hover:text-popup-muted">
+              홈으로
+            </Link>
+          </div>
         </div>
       )
     }
@@ -431,14 +442,17 @@ export default async function ViewerPage({ params }: Props) {
         ) : isLocked ? (
           <div className="py-20 text-center">
             <div className="mb-4 text-4xl">🔒</div>
-            <p className="mb-2 text-lg font-semibold text-popup-text">페이지 사용 기간이 만료되었습니다</p>
-            <p className="mb-6 text-sm text-popup-muted">30일 무료 기간이 종료되어 콘텐츠가 잠겼습니다.</p>
-            <a
-              href={`/${slug}/edit`}
-              className="inline-block rounded-lg bg-popup-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-popup-accent-hover"
+            <p className="mb-2 text-lg font-semibold text-popup-text">이 페이지의 수명이 다했어요</p>
+            <p className="mb-6 text-sm text-popup-muted">
+              30일 수명이 끝나 콘텐츠가 비공개로 전환됐어요.<br />
+              연장하면 다시 볼 수 있어요.
+            </p>
+            <Link
+              href={`/extend?slug=${slug}`}
+              className="inline-block rounded-lg bg-popup-accent px-6 py-2.5 text-sm font-semibold text-popup-accent-fg hover:bg-popup-accent-hover"
             >
-              잠금 해제하기
-            </a>
+              연장하기 →
+            </Link>
           </div>
         ) : (
           blocks.map(renderBlock)
@@ -448,11 +462,19 @@ export default async function ViewerPage({ params }: Props) {
       {/* Footer */}
       <div className="border-t border-popup-border px-6 py-4 text-center">
         <div className="flex items-center justify-center gap-3">
-          <Link href={`/${slug}/edit`} className="text-xs text-popup-faint hover:text-popup-muted">편집</Link>
-          <span className="text-popup-faint">·</span>
-          <ExpiryUpgradeButton slug={slug} remaining={remaining} />
-          <span className="text-popup-faint">·</span>
-          <ReportButton slug={slug} />
+          {isLocked ? (
+            <Link href="/" className="text-xs text-popup-faint hover:text-popup-muted">
+              홈으로
+            </Link>
+          ) : (
+            <>
+              <Link href={`/${slug}/edit`} className="text-xs text-popup-faint hover:text-popup-muted">편집</Link>
+              <span className="text-popup-faint">·</span>
+              <ExpiryUpgradeButton slug={slug} remaining={remaining} />
+              <span className="text-popup-faint">·</span>
+              <ReportButton slug={slug} />
+            </>
+          )}
         </div>
       </div>
     </div>
