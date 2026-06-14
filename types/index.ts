@@ -99,6 +99,32 @@ export interface Payment {
   created_at: string
 }
 
+// --- Subscription ---
+
+export type SubscriptionTier = 'lite' | 'pro'
+export type SubscriptionBillingCycle = 'monthly' | 'yearly'
+export type SubscriptionStatusValue = 'active' | 'past_due' | 'canceled' | 'paused'
+
+export interface Subscription {
+  id: string
+  user_id: string
+  tier: SubscriptionTier
+  billing_cycle: SubscriptionBillingCycle
+  status: SubscriptionStatusValue
+  billing_key: string
+  customer_key: string
+  card_company: string | null
+  card_number_masked: string | null
+  current_period_start: string
+  current_period_end: string
+  next_charge_at: string
+  cancel_at_period_end: boolean
+  canceled_at: string | null
+  failed_charge_count: number
+  created_at: string
+  updated_at: string
+}
+
 // --- Report ---
 
 export type ReportReason = 'illegal' | 'spam' | 'adult' | 'other'
@@ -194,6 +220,7 @@ export type Database = {
           listed_at: string | null
           search_vector: string | null
           html_content: string | null
+          size_bytes: number
         }
         Insert: {
           id?: string
@@ -216,6 +243,7 @@ export type Database = {
           listing_description?: string | null
           listed_at?: string | null
           search_vector?: string | null
+          size_bytes?: number
         }
         Update: {
           id?: string
@@ -238,6 +266,7 @@ export type Database = {
           listing_description?: string | null
           listed_at?: string | null
           search_vector?: string | null
+          size_bytes?: number
         }
         Relationships: []
       }
@@ -312,6 +341,116 @@ export type Database = {
           created_at?: string
         }
         Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          tier: string
+          billing_cycle: string
+          status: string
+          billing_key: string
+          customer_key: string
+          card_company: string | null
+          card_number_masked: string | null
+          current_period_start: string
+          current_period_end: string
+          next_charge_at: string
+          cancel_at_period_end: boolean
+          canceled_at: string | null
+          failed_charge_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          tier: string
+          billing_cycle: string
+          status: string
+          billing_key: string
+          customer_key: string
+          card_company?: string | null
+          card_number_masked?: string | null
+          current_period_start: string
+          current_period_end: string
+          next_charge_at: string
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          failed_charge_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          tier?: string
+          billing_cycle?: string
+          status?: string
+          billing_key?: string
+          customer_key?: string
+          card_company?: string | null
+          card_number_masked?: string | null
+          current_period_start?: string
+          current_period_end?: string
+          next_charge_at?: string
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          failed_charge_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscriptions_user_id_fkey'
+            columns: ['user_id']
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      subscription_charges: {
+        Row: {
+          id: string
+          subscription_id: string
+          order_id: string
+          amount: number
+          status: string
+          payment_key: string | null
+          error_code: string | null
+          error_message: string | null
+          attempted_at: string
+        }
+        Insert: {
+          id?: string
+          subscription_id: string
+          order_id: string
+          amount: number
+          status: string
+          payment_key?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          attempted_at?: string
+        }
+        Update: {
+          id?: string
+          subscription_id?: string
+          order_id?: string
+          amount?: number
+          status?: string
+          payment_key?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          attempted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscription_charges_subscription_id_fkey'
+            columns: ['subscription_id']
+            referencedRelation: 'subscriptions'
+            referencedColumns: ['id']
+          }
+        ]
       }
       page_emails: {
         Row: {

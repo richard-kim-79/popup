@@ -337,7 +337,7 @@ export default async function ViewerPage({ params }: Props) {
 
   const { data, error } = await supabase
     .from('pages')
-    .select('blocks, locked, expires_at, deleted_at, report_count, created_at, updated_at, html_content')
+    .select('user_id, blocks, locked, expires_at, deleted_at, report_count, created_at, updated_at, html_content')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
@@ -348,7 +348,13 @@ export default async function ViewerPage({ params }: Props) {
   const blocks = (data.blocks as unknown) as Block[]
   const remaining = daysLeft(data.expires_at)
   // DB locked 또는 expires_at 경과 시 잠금 처리 (크론 미실행 방어)
-  const isLocked = data.locked || new Date(data.expires_at) < new Date()
+  // 단, 페이지 소유자가 유료 구독자(Lite/Pro)면 만료 면제
+  let exempt = false
+  if (data.user_id) {
+    const { isLifecycleExempt } = await import('@/lib/subscription')
+    exempt = await isLifecycleExempt(supabase, data.user_id)
+  }
+  const isLocked = !exempt && (data.locked || new Date(data.expires_at) < new Date())
   const isHtmlPage = !!data.html_content
 
   // ── HTML 페이지 — 풀스크린 iframe srcdoc 렌더링 ──────────────

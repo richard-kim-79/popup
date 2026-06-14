@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { getSupabaseBrowser } from '@/lib/supabase'
 import PreviewCard from '@/components/MyPages/PreviewCard'
 import ExpireNowModal from '@/components/Modal/ExpireNowModal'
+import SubscriptionStatus from '@/components/MyPages/SubscriptionStatus'
 
 interface Page {
   slug: string
@@ -372,6 +373,9 @@ export default function MyPagesPage() {
                 이 브라우저에 저장된 {claimed}개 페이지를 계정에 연결했어요.
               </div>
             )}
+
+            {/* ── 구독 상태 ──────────────────────────────────── */}
+            <SubscriptionStatus />
 
             {/* ── 탭 ───────────────────────────────────────────── */}
             {pages && pages.length > 0 && (
