@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { verifyEditToken } from '@/lib/token'
+import { checkStorageQuota } from '@/lib/subscription'
 import type { ApiError } from '@/types'
 
 type Params = { params: Promise<{ slug: string }> }
@@ -105,6 +106,24 @@ export async function POST(
   }
 
   const supabase = getSupabaseAdmin()
+
+  // 페이지 소유자의 티어별 저장 용량 한도 사전 체크 (로그인 사용자만)
+  const { data: page } = await supabase
+    .from('pages')
+    .select('user_id')
+    .eq('slug', slug)
+    .is('deleted_at', null)
+    .single()
+
+  if (page?.user_id) {
+    const quota = await checkStorageQuota(supabase, page.user_id, size)
+    if (quota && !quota.allowed) {
+      return NextResponse.json(
+        { error: quota.reason ?? '저장 용량을 초과했습니다.' },
+        { status: 413 },
+      )
+    }
+  }
 
   try {
     await ensureBucket(supabase)

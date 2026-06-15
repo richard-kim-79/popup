@@ -7,9 +7,11 @@ interface UsageResponse {
   tier: string
   tierName: string
   pageCount: number
-  pagesBytes: number
-  storageBytes: number    // 한도
-  usageRatio: number      // 0~1
+  textBytes: number       // 텍스트(html+blocks)
+  attachmentBytes: number // 첨부 이미지·PDF
+  usedBytes: number        // 합산 사용량
+  limitBytes: number       // 티어 한도
+  usageRatio: number       // 0~1
   recommendUpgrade: boolean
   nextTier: string | null
   nextTierName: string | null
@@ -30,9 +32,9 @@ export async function GET(): Promise<NextResponse<UsageResponse | { error: strin
 
   const admin = getSupabaseAdmin()
   const tier = await getUserTier(admin, user.id)
-  const { pageCount, pagesBytes } = await getUserUsage(admin, user.id)
+  const { pageCount, textBytes, storageBytes, totalBytes } = await getUserUsage(admin, user.id)
   const t = TIERS[tier]
-  const usageRatio = t.storageBytes > 0 ? pagesBytes / t.storageBytes : 0
+  const usageRatio = t.storageBytes > 0 ? totalBytes / t.storageBytes : 0
 
   // 상향 추천: 80% 이상 + 다음 티어가 존재 (Pro는 상향 없음)
   const upTier = nextTier(tier)
@@ -42,8 +44,10 @@ export async function GET(): Promise<NextResponse<UsageResponse | { error: strin
     tier,
     tierName: t.name,
     pageCount,
-    pagesBytes,
-    storageBytes: t.storageBytes,
+    textBytes,
+    attachmentBytes: storageBytes,
+    usedBytes: totalBytes,
+    limitBytes: t.storageBytes,
     usageRatio,
     recommendUpgrade,
     nextTier: upTier,

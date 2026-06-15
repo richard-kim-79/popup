@@ -7,8 +7,10 @@ interface UsageData {
   tier: string
   tierName: string
   pageCount: number
-  pagesBytes: number
-  storageBytes: number
+  textBytes: number
+  attachmentBytes: number
+  usedBytes: number
+  limitBytes: number
   usageRatio: number
   recommendUpgrade: boolean
   nextTier: string | null
@@ -62,16 +64,19 @@ export default function UsageCard() {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-medium text-popup-muted">저장 용량</span>
             <span className={`text-xs font-semibold ${recommendOrOver ? 'text-popup-warn' : 'text-popup-text'}`}>
-              {formatBytes(data.pagesBytes)} / {formatBytes(data.storageBytes)}
+              {formatBytes(data.usedBytes)} / {formatBytes(data.limitBytes)}
             </span>
             <span className={`text-[10px] ${recommendOrOver ? 'text-popup-warn' : 'text-popup-muted'}`}>
               ({pct}%)
             </span>
             <span className="ml-1 text-[10px] text-popup-faint">· {data.pageCount}개 페이지 · {data.tierName}</span>
           </div>
+          <p className="mt-0.5 text-[10px] text-popup-faint">
+            텍스트 {formatBytes(data.textBytes)} · 첨부 {formatBytes(data.attachmentBytes)}
+          </p>
 
           {/* 진행률 바 */}
           <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-popup-surface">

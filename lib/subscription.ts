@@ -53,17 +53,18 @@ export async function getUserTier(
 
 export interface UserUsage {
   pageCount: number
-  pagesBytes: number
+  textBytes: number       // html_content + blocks JSON
+  storageBytes: number    // 첨부 이미지·PDF (storage.objects)
+  totalBytes: number      // text + storage
 }
 
 /**
- * 사용자의 현재 저장 사용량 — user_storage_usage 뷰 기반
+ * 사용자의 현재 저장 사용량 — 텍스트(pages.size_bytes) + 첨부(storage.objects RPC)
  */
 export async function getUserUsage(
   admin: SupabaseClient<Database>,
   userId: string,
 ): Promise<UserUsage> {
-  // user_storage_usage 뷰는 schema에 없으므로 raw select로
   const { data } = await admin
     .from('pages')
     .select('size_bytes')
@@ -72,21 +73,34 @@ export async function getUserUsage(
 
   const rows = data ?? []
   const pageCount = rows.length
-  const pagesBytes = rows.reduce((sum, r) => sum + (r.size_bytes ?? 0), 0)
-  return { pageCount, pagesBytes }
+  const textBytes = rows.reduce((sum, r) => sum + (r.size_bytes ?? 0), 0)
+
+  // 첨부파일(Storage) 용량 — SECURITY DEFINER RPC
+  let storageBytes = 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sb } = await (admin as any).rpc('get_user_storage_bytes', { p_user_id: userId })
+  if (typeof sb === 'number') storageBytes = sb
+  else if (typeof sb === 'string') storageBytes = parseInt(sb, 10) || 0
+
+  return {
+    pageCount,
+    textBytes,
+    storageBytes,
+    totalBytes: textBytes + storageBytes,
+  }
 }
 
 export interface UsageCheckResult {
   allowed: boolean
   tier: Tier
-  storageBytes: number    // 한도
-  pagesBytes: number       // 현재 사용량
+  limitBytes: number      // 티어 한도
+  usedBytes: number        // 현재 총 사용량 (텍스트 + 첨부)
   needed: number           // 추가될 바이트
   reason?: string
 }
 
 /**
- * 페이지 생성 전 사용량 한도 체크
+ * 페이지 생성·파일 업로드 전 사용량 한도 체크 (텍스트 + 첨부 합산 기준)
  *
  * 익명 사용자(userId null)는 한도 적용 안 함 → 기존 정책 유지
  */
@@ -99,26 +113,26 @@ export async function checkStorageQuota(
 
   const { TIERS } = await import('@/lib/tiers')
   const tier = await getUserTier(admin, userId)
-  const { pagesBytes } = await getUserUsage(admin, userId)
+  const { totalBytes } = await getUserUsage(admin, userId)
   const limit = TIERS[tier].storageBytes
 
-  const wouldUse = pagesBytes + newBytes
+  const wouldUse = totalBytes + newBytes
   if (wouldUse > limit) {
     return {
       allowed: false,
       tier,
-      storageBytes: limit,
-      pagesBytes,
+      limitBytes: limit,
+      usedBytes: totalBytes,
       needed: newBytes,
-      reason: `${TIERS[tier].name} 티어의 저장 용량(${formatBytes(limit)})을 초과해요. 현재 ${formatBytes(pagesBytes)} 사용 중이고, 이 페이지는 ${formatBytes(newBytes)}예요.`,
+      reason: `${TIERS[tier].name} 티어의 저장 용량(${formatBytes(limit)})을 초과해요. 현재 ${formatBytes(totalBytes)} 사용 중이고, 이번 항목은 ${formatBytes(newBytes)}예요.`,
     }
   }
 
   return {
     allowed: true,
     tier,
-    storageBytes: limit,
-    pagesBytes,
+    limitBytes: limit,
+    usedBytes: totalBytes,
     needed: newBytes,
   }
 }
