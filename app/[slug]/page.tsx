@@ -10,6 +10,7 @@ import SocialEmbed from '@/components/Blocks/SocialEmbed'
 import ExpiryUpgradeButton from '@/components/Viewer/ExpiryUpgradeButton'
 import ExpireNowButton from '@/components/Viewer/ExpireNowButton'
 import LockedBanner from '@/components/Viewer/LockedBanner'
+import MadeWithPopup from '@/components/Viewer/MadeWithPopup'
 
 /** URL에서 hostname 안전하게 추출 */
 function safeHostname(url: string): string {
@@ -378,6 +379,7 @@ export default async function ViewerPage({ params }: Props) {
             <Link href="/" className="text-xs text-popup-faint hover:text-popup-muted">
               홈으로
             </Link>
+            <MadeWithPopup source="expired" variant="cta" />
           </div>
         </div>
       )
@@ -460,6 +462,9 @@ export default async function ViewerPage({ params }: Props) {
             >
               연장하기 →
             </Link>
+            <div className="mt-4">
+              <MadeWithPopup source="expired" variant="cta" />
+            </div>
           </div>
         ) : (
           blocks.map(renderBlock)
@@ -485,6 +490,12 @@ export default async function ViewerPage({ params }: Props) {
             </>
           )}
         </div>
+        {/* 방문자용 바이럴 CTA — 공유받은 사람을 신규 생성으로 (소유자 액션과 분리) */}
+        {!isLocked && (
+          <div className="mt-2.5">
+            <MadeWithPopup source="shared" variant="inline" />
+          </div>
+        )}
       </div>
     </div>
   )

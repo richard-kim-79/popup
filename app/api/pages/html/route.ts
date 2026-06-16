@@ -4,6 +4,7 @@ import { hashPin } from '@/lib/pin'
 import { issueEditToken } from '@/lib/token'
 import { generateUniqueSlug } from '@/lib/slug'
 import { checkStorageQuota } from '@/lib/subscription'
+import { normalizeSource } from '@/lib/source'
 import type { CreatePageResponse, ApiError } from '@/types'
 
 const MAX_HTML_BYTES = 500_000 // 500 KB
@@ -14,6 +15,7 @@ export async function POST(
   const body = await req.json().catch(() => null) as {
     html?: unknown
     pin?: unknown
+    source?: unknown
   } | null
 
   // PIN 검증
@@ -62,6 +64,7 @@ export async function POST(
     delete_at,
     locked: false,
     user_id: userId,
+    source: normalizeSource(body.source),
   })
 
   if (error) {

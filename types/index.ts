@@ -221,6 +221,7 @@ export type Database = {
           search_vector: string | null
           html_content: string | null
           size_bytes: number
+          source: string | null
         }
         Insert: {
           id?: string
@@ -244,6 +245,7 @@ export type Database = {
           listed_at?: string | null
           search_vector?: string | null
           size_bytes?: number
+          source?: string | null
         }
         Update: {
           id?: string
@@ -267,6 +269,7 @@ export type Database = {
           listed_at?: string | null
           search_vector?: string | null
           size_bytes?: number
+          source?: string | null
         }
         Relationships: []
       }
