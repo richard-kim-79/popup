@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { getSupabaseBrowser } from '@/lib/supabase'
 import PreviewCard from '@/components/MyPages/PreviewCard'
 import ExpireNowModal from '@/components/Modal/ExpireNowModal'
+import ExtendLifespanModal from '@/components/Modal/ExtendLifespanModal'
 import SubscriptionStatus from '@/components/MyPages/SubscriptionStatus'
 import UsageCard from '@/components/MyPages/UsageCard'
 
@@ -67,6 +68,12 @@ export default function MyPagesPage() {
 
   // "지금 만료" 모달 — 어떤 slug에 대해 띄울지
   const [expireSlug, setExpireSlug] = useState<string | null>(null)
+
+  // "수명 연장" 모달 — 유료 구독자 전용
+  const [extendSlug, setExtendSlug] = useState<string | null>(null)
+
+  // 현재 사용자 티어 — 유료(lite/pro) 여부로 수명 연장 노출 결정
+  const [isPaid, setIsPaid] = useState(false)
 
   // 호버 미리보기
   const [hoverPreview, setHoverPreview] = useState<{
@@ -193,6 +200,14 @@ export default function MyPagesPage() {
         })
         await claimLocalPages()
         await loadMine()
+        // 티어 조회 — 유료 구독자에게만 수명 연장 노출
+        try {
+          const r = await fetch('/api/subscriptions/usage')
+          const u = await r.json() as { tier?: string }
+          setIsPaid(u.tier === 'lite' || u.tier === 'pro')
+        } catch {
+          // 무시 — 기본 false
+        }
       }
       setLoading(false)
     })
@@ -474,6 +489,24 @@ export default function MyPagesPage() {
                       {/* 우측 액션 — <a> 안에 또 다른 <a>(Link)를 두면 nested anchor가 되어 HTML 사양 위반.
                           버튼으로 만들고 stopPropagation + preventDefault + router.push로 분기 */}
                       <div className="ml-4 flex shrink-0 items-center gap-1.5">
+                        {isPaid && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              setExtendSlug(p.slug)
+                            }}
+                            title="수명 연장"
+                            aria-label={`${p.title} 수명 연장`}
+                            className="rounded-md p-1.5 text-popup-muted hover:bg-popup-accent-bg hover:text-popup-accent transition-colors"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M5 13a7 7 0 0 1 7-7c4 0 7 3 7 8a8 8 0 0 1-2 5" />
+                              <path d="M12 21c0-5 2-9 6-11" />
+                            </svg>
+                          </button>
+                        )}
                         {!isLocked && (
                           <button
                             type="button"
@@ -497,7 +530,12 @@ export default function MyPagesPage() {
                           onClick={(e) => {
                             e.stopPropagation()
                             e.preventDefault()
-                            router.push(isLocked ? `/extend?slug=${p.slug}` : `/${p.slug}/edit`)
+                            if (isLocked && isPaid) {
+                              // 유료 구독자: 결제 없이 바로 연장 모달
+                              setExtendSlug(p.slug)
+                            } else {
+                              router.push(isLocked ? `/extend?slug=${p.slug}` : `/${p.slug}/edit`)
+                            }
                           }}
                           className="rounded-md bg-popup-accent px-3 py-1.5 text-xs font-medium text-popup-accent-fg hover:bg-popup-accent-hover"
                         >
@@ -603,6 +641,19 @@ export default function MyPagesPage() {
           onExpired={() => {
             setExpireSlug(null)
             void loadMine()  // 카드를 활성 탭에서 만료 탭으로 즉시 반영
+          }}
+        />
+      )}
+
+      {/* ── 수명 연장 모달 (유료 구독자) ──────────────────────── */}
+      {extendSlug && (
+        <ExtendLifespanModal
+          slug={extendSlug}
+          editToken={typeof window !== 'undefined' ? localStorage.getItem(`popup_token_${extendSlug}`) : null}
+          onClose={() => setExtendSlug(null)}
+          onExtended={() => {
+            setExtendSlug(null)
+            void loadMine()  // 연장된 만료일 / 잠금 해제 즉시 반영
           }}
         />
       )}
