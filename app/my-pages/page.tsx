@@ -75,6 +75,9 @@ export default function MyPagesPage() {
   // 현재 사용자 티어 — 유료(lite/pro) 여부로 수명 연장 노출 결정
   const [isPaid, setIsPaid] = useState(false)
 
+  // 구독·저장용량 패널(햄버거 메뉴) 펼침 여부
+  const [infoOpen, setInfoOpen] = useState(false)
+
   // 호버 미리보기
   const [hoverPreview, setHoverPreview] = useState<{
     slug: string
@@ -342,7 +345,7 @@ export default function MyPagesPage() {
         )}
       </nav>
 
-      <div className="mx-auto max-w-[480px] px-6 py-16">
+      <div className="mx-auto max-w-[640px] px-4 py-16 sm:px-6">
         {/* ── 로그인된 사용자 ─────────────────────────────────── */}
         {user ? (
           <>
@@ -381,6 +384,23 @@ export default function MyPagesPage() {
                 >
                   + 페이지 등록
                 </button>
+                <button
+                  onClick={() => setInfoOpen((v) => !v)}
+                  aria-label="구독·저장용량 메뉴"
+                  aria-expanded={infoOpen}
+                  title="구독·저장용량"
+                  className={`rounded-lg border px-2.5 py-2 transition-colors ${
+                    infoOpen
+                      ? 'border-popup-text bg-popup-surface text-popup-text'
+                      : 'border-popup-border bg-popup-white text-popup-muted hover:border-popup-text hover:text-popup-text'
+                  }`}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -390,11 +410,13 @@ export default function MyPagesPage() {
               </div>
             )}
 
-            {/* ── 구독 상태 ──────────────────────────────────── */}
-            <SubscriptionStatus />
-
-            {/* ── 저장 용량 사용량 + 상향 추천 ─────────────────── */}
-            <UsageCard />
+            {/* ── 구독 상태 + 저장 용량 (햄버거 메뉴로 접힘) ───── */}
+            {infoOpen && (
+              <div className="mb-2">
+                <SubscriptionStatus />
+                <UsageCard />
+              </div>
+            )}
 
             {/* ── 탭 ───────────────────────────────────────────── */}
             {pages && pages.length > 0 && (
