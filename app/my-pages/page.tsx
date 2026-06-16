@@ -78,6 +78,9 @@ export default function MyPagesPage() {
   // 구독·저장용량 패널(햄버거 메뉴) 펼침 여부
   const [infoOpen, setInfoOpen] = useState(false)
 
+  // 카드 수명 관리(시계 아이콘) 메뉴 — 어떤 slug의 메뉴를 열지
+  const [actionSlug, setActionSlug] = useState<string | null>(null)
+
   // 호버 미리보기
   const [hoverPreview, setHoverPreview] = useState<{
     slug: string
@@ -511,41 +514,81 @@ export default function MyPagesPage() {
                       {/* 우측 액션 — <a> 안에 또 다른 <a>(Link)를 두면 nested anchor가 되어 HTML 사양 위반.
                           버튼으로 만들고 stopPropagation + preventDefault + router.push로 분기 */}
                       <div className="ml-4 flex shrink-0 items-center gap-1.5">
-                        {isPaid && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              e.preventDefault()
-                              setExtendSlug(p.slug)
-                            }}
-                            title="수명 연장"
-                            aria-label={`${p.title} 수명 연장`}
-                            className="rounded-md p-1.5 text-popup-muted hover:bg-popup-accent-bg hover:text-popup-accent transition-colors"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M5 13a7 7 0 0 1 7-7c4 0 7 3 7 8a8 8 0 0 1-2 5" />
-                              <path d="M12 21c0-5 2-9 6-11" />
-                            </svg>
-                          </button>
-                        )}
                         {!isLocked && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              e.preventDefault()
-                              setExpireSlug(p.slug)
-                            }}
-                            title="지금 만료시키기"
-                            aria-label={`${p.title} 지금 만료시키기`}
-                            className="rounded-md p-1.5 text-popup-muted hover:bg-popup-warn-bg hover:text-popup-warn transition-colors"
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="9" />
-                              <path d="M12 7v5l3 2" />
-                            </svg>
-                          </button>
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                e.preventDefault()
+                                // 유료: 연장·만료 메뉴 토글 / 무료: 만료만 있으므로 바로 실행
+                                if (isPaid) {
+                                  setActionSlug((cur) => (cur === p.slug ? null : p.slug))
+                                } else {
+                                  setExpireSlug(p.slug)
+                                }
+                              }}
+                              title={isPaid ? '수명 연장 · 지금 만료' : '지금 만료시키기'}
+                              aria-label={`${p.title} 수명 관리`}
+                              aria-haspopup={isPaid ? 'menu' : undefined}
+                              aria-expanded={isPaid ? actionSlug === p.slug : undefined}
+                              className={`rounded-md p-1.5 transition-colors ${
+                                actionSlug === p.slug
+                                  ? 'bg-popup-surface text-popup-text'
+                                  : 'text-popup-muted hover:bg-popup-surface hover:text-popup-text'
+                              }`}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="9" />
+                                <path d="M12 7v5l3 2" />
+                              </svg>
+                            </button>
+
+                            {isPaid && actionSlug === p.slug && (
+                              <>
+                                {/* 바깥 클릭 닫기 */}
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    e.preventDefault()
+                                    setActionSlug(null)
+                                  }}
+                                  className="fixed inset-0 z-[300]"
+                                />
+                                <div
+                                  role="menu"
+                                  className="absolute right-0 top-full z-[310] mt-1 w-36 overflow-hidden rounded-lg border border-popup-border bg-popup-white py-1 shadow-lg"
+                                >
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      e.preventDefault()
+                                      setActionSlug(null)
+                                      setExtendSlug(p.slug)
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-popup-text hover:bg-popup-accent-bg transition-colors"
+                                  >
+                                    <span>🌱</span> 수명 연장
+                                  </button>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      e.preventDefault()
+                                      setActionSlug(null)
+                                      setExpireSlug(p.slug)
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-popup-warn hover:bg-popup-warn-bg transition-colors"
+                                  >
+                                    <span>⏱</span> 지금 만료
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         )}
                         <button
                           type="button"
