@@ -222,6 +222,8 @@ export type Database = {
           html_content: string | null
           size_bytes: number
           source: string | null
+          auto_listed: boolean
+          gallery_opt_out: boolean
         }
         Insert: {
           id?: string
@@ -246,6 +248,8 @@ export type Database = {
           search_vector?: string | null
           size_bytes?: number
           source?: string | null
+          auto_listed?: boolean
+          gallery_opt_out?: boolean
         }
         Update: {
           id?: string
@@ -270,6 +274,8 @@ export type Database = {
           search_vector?: string | null
           size_bytes?: number
           source?: string | null
+          auto_listed?: boolean
+          gallery_opt_out?: boolean
         }
         Relationships: []
       }

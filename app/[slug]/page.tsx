@@ -8,7 +8,6 @@ import { extractHtmlMeta } from '@/lib/html-meta'
 import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
 import SocialEmbed from '@/components/Blocks/SocialEmbed'
 import ExpiryUpgradeButton from '@/components/Viewer/ExpiryUpgradeButton'
-import ExpireNowButton from '@/components/Viewer/ExpireNowButton'
 import LockedBanner from '@/components/Viewer/LockedBanner'
 import MadeWithPopup from '@/components/Viewer/MadeWithPopup'
 
@@ -485,8 +484,7 @@ export default async function ViewerPage({ params }: Props) {
               <ExpiryUpgradeButton slug={slug} remaining={remaining} />
               <span className="text-popup-faint">·</span>
               <ReportButton slug={slug} />
-              {/* 소유자(localStorage 토큰 보유)에게만 노출 */}
-              <ExpireNowButton slug={slug} />
+              {/* '지금 만료'는 공유 페이지 푸터에서 제거 — 소유자는 /my-pages에서 관리 */}
             </>
           )}
         </div>

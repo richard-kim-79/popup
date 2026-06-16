@@ -17,6 +17,7 @@ interface Page {
   created_at?: string
   is_html?: boolean
   locked?: boolean
+  listed?: boolean
 }
 
 type SortKey = 'recent' | 'expiring' | 'title' | 'locked-first'
@@ -241,6 +242,22 @@ export default function MyPagesPage() {
   const daysLeft = (expiresAt: string) => {
     const diff = new Date(expiresAt).getTime() - Date.now()
     return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  }
+
+  // ── 검색 갤러리 노출 on/off (옵트아웃) — 낙관적 업데이트 ──────
+  const toggleListing = async (slug: string, next: boolean) => {
+    setPages((prev) => prev ? prev.map((p) => (p.slug === slug ? { ...p, listed: next } : p)) : prev)
+    try {
+      const res = await fetch(`/api/pages/${slug}/listing`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listed: next }),
+      })
+      if (!res.ok) throw new Error('failed')
+    } catch {
+      // 실패 시 롤백
+      setPages((prev) => prev ? prev.map((p) => (p.slug === slug ? { ...p, listed: !next } : p)) : prev)
+    }
   }
 
   // ── 정렬·탭: localStorage 복원 ────────────────────────────────
@@ -507,9 +524,28 @@ export default function MyPagesPage() {
                             </span>
                           )}
                         </div>
-                        <p className="mt-0.5 text-xs text-popup-faint">
-                          {left > 0 ? `${left}일 남음` : '만료됨'}
-                        </p>
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-popup-faint">
+                          <span>{left > 0 ? `${left}일 남음` : '만료됨'}</span>
+                          {!isLocked && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                e.preventDefault()
+                                void toggleListing(p.slug, !p.listed)
+                              }}
+                              title={p.listed ? '검색 갤러리에 공개 중 — 눌러서 숨기기' : '검색 갤러리에서 숨김 — 눌러서 공개'}
+                              aria-label={`${p.title} 갤러리 ${p.listed ? '숨기기' : '공개'}`}
+                              className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+                                p.listed
+                                  ? 'bg-popup-accent-bg text-popup-accent'
+                                  : 'text-popup-faint hover:text-popup-muted'
+                              }`}
+                            >
+                              {p.listed ? '갤러리 공개중' : '갤러리 숨김'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {/* 우측 액션 — <a> 안에 또 다른 <a>(Link)를 두면 nested anchor가 되어 HTML 사양 위반.
                           버튼으로 만들고 stopPropagation + preventDefault + router.push로 분기 */}

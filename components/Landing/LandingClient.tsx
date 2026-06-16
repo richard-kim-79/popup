@@ -16,11 +16,20 @@ export default function LandingClient() {
   const [modalDragOver, setModalDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // ── 유입 출처(ref) 보존 — 공유/만료 페이지 CTA에서 ?ref=로 진입 시 저장 ──
+  // ── 유입 출처(ref) 보존 + 유입 이벤트 비콘 — 채널별 전환 측정 ──
   useEffect(() => {
     try {
       const ref = new URLSearchParams(window.location.search).get('ref')
-      if (ref) sessionStorage.setItem(REF_KEY, ref)
+      if (ref) {
+        sessionStorage.setItem(REF_KEY, ref)
+        // arrival 이벤트 기록 (fire-and-forget)
+        void fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'arrival', source: ref }),
+          keepalive: true,
+        }).catch(() => {})
+      }
     } catch {
       // 무시
     }

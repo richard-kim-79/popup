@@ -5,6 +5,7 @@ import { issueEditToken } from '@/lib/token'
 import { generateUniqueSlug } from '@/lib/slug'
 import { checkStorageQuota } from '@/lib/subscription'
 import { normalizeSource } from '@/lib/source'
+import { logPageEvent } from '@/lib/events'
 import type { CreatePageResponse, ApiError } from '@/types'
 
 const MAX_HTML_BYTES = 500_000 // 500 KB
@@ -70,6 +71,9 @@ export async function POST(
   if (error) {
     return NextResponse.json({ error: '페이지 생성에 실패했습니다.' }, { status: 500 })
   }
+
+  // 채널별 전환 측정 — 생성 이벤트 기록 (fire-and-forget)
+  logPageEvent(supabase, 'created', normalizeSource(body.source), slug)
 
   const editToken = issueEditToken(slug)
   return NextResponse.json({ slug, editToken }, { status: 201 })

@@ -7,6 +7,7 @@ import { checkStorageQuota } from '@/lib/subscription'
 import { getTemplateById } from '@/lib/templates'
 import { assignBlockIds } from '@/lib/validate-blocks'
 import { normalizeSource } from '@/lib/source'
+import { logPageEvent } from '@/lib/events'
 import type { CreatePageResponse, ApiError, Json } from '@/types'
 
 export async function POST(req: NextRequest): Promise<NextResponse<CreatePageResponse | ApiError>> {
@@ -67,6 +68,9 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreatePageRes
     console.error('[POST /api/pages]', error.message)
     return NextResponse.json({ error: '페이지 생성에 실패했습니다.' }, { status: 500 })
   }
+
+  // 채널별 전환 측정 — 생성 이벤트 기록 (fire-and-forget)
+  logPageEvent(supabase, 'created', source, slug)
 
   const editToken = issueEditToken(slug)
   return NextResponse.json({ slug, editToken }, { status: 201 })

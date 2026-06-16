@@ -9,6 +9,7 @@ interface PageResult {
   created_at: string
   is_html: boolean
   locked: boolean
+  listed: boolean
 }
 
 interface Block { type: string; content?: string }
@@ -28,7 +29,7 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
   // 1) user_id 직접 소유
   const { data: owned } = await supabase
     .from('pages')
-    .select('slug, blocks, expires_at, created_at, html_content, locked, deleted_at')
+    .select('slug, blocks, expires_at, created_at, html_content, locked, deleted_at, listed')
     .eq('user_id', user.id)
     .is('deleted_at', null)
 
@@ -36,14 +37,14 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
   const { data: linked } = email
     ? await supabase
         .from('page_emails')
-        .select('pages(slug, blocks, expires_at, created_at, html_content, locked, deleted_at)')
+        .select('pages(slug, blocks, expires_at, created_at, html_content, locked, deleted_at, listed)')
         .eq('email', email)
-    : { data: [] as Array<{ pages: { slug: string; blocks: unknown; expires_at: string; created_at: string; html_content: string | null; locked: boolean; deleted_at: string | null } | null }> }
+    : { data: [] as Array<{ pages: { slug: string; blocks: unknown; expires_at: string; created_at: string; html_content: string | null; locked: boolean; deleted_at: string | null; listed: boolean } | null }> }
 
   const seen = new Set<string>()
   const pages: PageResult[] = []
 
-  const pushPage = (row: { slug: string; blocks: unknown; expires_at: string; created_at: string; html_content: string | null; locked: boolean; deleted_at: string | null } | null) => {
+  const pushPage = (row: { slug: string; blocks: unknown; expires_at: string; created_at: string; html_content: string | null; locked: boolean; deleted_at: string | null; listed: boolean } | null) => {
     if (!row || row.deleted_at || seen.has(row.slug)) return
     seen.add(row.slug)
     // 제목 추출: HTML 페이지면 <title>/og:title 우선, 블록 페이지면 첫 H1
@@ -63,6 +64,7 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
       created_at: row.created_at,
       is_html: !!row.html_content,
       locked: row.locked,
+      listed: !!row.listed,
     })
   }
 

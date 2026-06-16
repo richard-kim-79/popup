@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { verifyEditToken } from '@/lib/token'
+import { deriveListing } from '@/lib/listing'
 import type { ApiError } from '@/types'
 
 type Params = { params: Promise<{ slug: string }> }
@@ -25,7 +26,7 @@ export async function PUT(
   // 잠긴 페이지는 편집 불가
   const { data: page } = await supabase
     .from('pages')
-    .select('locked, deleted_at')
+    .select('locked, deleted_at, listed, auto_listed, gallery_opt_out')
     .eq('slug', slug)
     .single()
 
@@ -37,9 +38,24 @@ export async function PUT(
     return NextResponse.json({ error: '잠긴 페이지입니다. 플랜을 업그레이드하세요.' }, { status: 403 })
   }
 
+  // ── 검색 갤러리 자동 노출(신규 페이지) — 콘텐츠가 생기면 자동 등록 ──
+  // 옵트아웃 안 했고, (아직 미등록 또는 자동등록 페이지)이며, 제목 도출 가능할 때만.
+  // 수동 등록(listed && !auto_listed)은 사용자 큐레이션이므로 건드리지 않는다.
+  const update: Record<string, unknown> = { blocks: body.blocks }
+  if (!page.gallery_opt_out && (page.auto_listed || !page.listed)) {
+    const { title, description } = deriveListing(body.blocks)
+    if (title) {
+      update.listed = true
+      update.auto_listed = true
+      update.listing_title = title
+      update.listing_description = description
+      update.listed_at = new Date().toISOString()
+    }
+  }
+
   const { error } = await supabase
     .from('pages')
-    .update({ blocks: body.blocks })
+    .update(update)
     .eq('slug', slug)
 
   if (error) {

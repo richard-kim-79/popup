@@ -3,6 +3,7 @@ import LogoutButton from './LogoutButton'
 
 const NAV = [
   { href: '/admin',          label: '📊 개요' },
+  { href: '/admin/growth',   label: '📈 성장' },
   { href: '/admin/pages',    label: '📄 페이지' },
   { href: '/admin/payments', label: '💳 결제' },
   { href: '/admin/reports',  label: '🚨 신고' },
