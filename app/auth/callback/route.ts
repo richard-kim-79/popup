@@ -24,8 +24,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const supabase = await getSupabaseServer()
   const { error } = await supabase.auth.exchangeCodeForSession(code)
   if (error) {
+    // PKCE 검증자 쿠키 부재(다른 호스트/탭/스토리지 초기화 등) → 영문 원문 대신 재시도 안내
+    const isPkce = /code verifier|pkce/i.test(error.message)
+    const msg = isPkce
+      ? '로그인 세션이 만료됐어요. 같은 창에서 다시 시도해 주세요.'
+      : error.message
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(error.message)}`,
+      `${origin}/login?error=${encodeURIComponent(msg)}`,
     )
   }
 

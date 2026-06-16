@@ -21,7 +21,10 @@ function LoginInner() {
     setLoading(true)
     setError('')
     const supabase = getSupabaseBrowser()
-    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL ?? window.location.origin).replace(/\/$/, '')
+    // PKCE 검증자 쿠키는 "현재 브라우저 origin"에 기록되므로, 콜백도 반드시 같은 origin으로
+    // 돌아와야 한다. NEXT_PUBLIC_BASE_URL(정식 도메인)이 현재 호스트와 다르면(apex↔www,
+    // vercel.app 등) 쿠키가 콜백 요청에 실리지 않아 "PKCE code verifier not found"가 발생.
+    const baseUrl = window.location.origin.replace(/\/$/, '')
     const { error: e } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
