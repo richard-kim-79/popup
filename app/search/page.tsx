@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import type { SearchResult } from '@/app/api/search/route'
 import type { Block, PageResponse } from '@/types'
+import { extractHtmlMeta } from '@/lib/html-meta'
 
 const BASE = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com'
 
@@ -83,7 +84,12 @@ function RegisterModal({
         const res = await fetch(`/api/pages/${encodeURIComponent(slug)}`)
         if (!res.ok) return
         const json = await res.json() as PageResponse
-        const extracted = extractTitleFromBlocks(json.blocks ?? [])
+        // 블록 페이지: 첫 H1/H2/text. HTML 페이지: <title>/og:title 에서 추출
+        let extracted = extractTitleFromBlocks(json.blocks ?? [])
+        if (!extracted && json.htmlContent) {
+          const meta = extractHtmlMeta(json.htmlContent)
+          if (meta.title) extracted = meta.title.slice(0, 80)
+        }
         if (extracted) {
           setRegTitle((prev) => (titleAutoFilled || prev === '') ? extracted : prev)
           setTitleAutoFilled(true)
