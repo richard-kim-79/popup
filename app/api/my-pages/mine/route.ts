@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseServer, getSupabaseAdmin } from '@/lib/supabase-server'
 import { extractHtmlMeta } from '@/lib/html-meta'
+import { blocksPlainText } from '@/lib/search-text'
 
 interface PageResult {
   slug: string
@@ -10,6 +11,7 @@ interface PageResult {
   is_html: boolean
   locked: boolean
   listed: boolean
+  searchText: string  // 제목 + 본문(소문자) — 문서 검색용
 }
 
 interface Block { type: string; content?: string }
@@ -47,15 +49,18 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
   const pushPage = (row: { slug: string; blocks: unknown; expires_at: string; created_at: string; html_content: string | null; locked: boolean; deleted_at: string | null; listed: boolean } | null) => {
     if (!row || row.deleted_at || seen.has(row.slug)) return
     seen.add(row.slug)
-    // 제목 추출: HTML 페이지면 <title>/og:title 우선, 블록 페이지면 첫 H1
+    // 제목 + 검색 본문 추출: HTML 페이지면 <title>/메타, 블록 페이지면 블록 평문
     let title: string
+    let contentText: string
     if (row.html_content) {
       const meta = extractHtmlMeta(row.html_content)
       title = meta.title?.slice(0, 80) ?? 'HTML 페이지'
+      contentText = [meta.title, meta.description].filter(Boolean).join(' ')
     } else {
       const blocks = (row.blocks ?? []) as Block[]
       const titleBlock = blocks.find((b) => b.type === 'h1' && b.content?.trim())
       title = titleBlock?.content?.trim() ?? row.slug
+      contentText = blocksPlainText(row.blocks)
     }
     pages.push({
       slug: row.slug,
@@ -65,6 +70,7 @@ export async function GET(): Promise<NextResponse<{ pages: PageResult[] } | { er
       is_html: !!row.html_content,
       locked: row.locked,
       listed: !!row.listed,
+      searchText: `${title} ${contentText}`.toLowerCase(),
     })
   }
 

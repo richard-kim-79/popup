@@ -18,6 +18,7 @@ interface Page {
   is_html?: boolean
   locked?: boolean
   listed?: boolean
+  searchText?: string
 }
 
 type SortKey = 'recent' | 'expiring' | 'title' | 'locked-first'
@@ -63,6 +64,9 @@ export default function MyPagesPage() {
 
   // 정렬
   const [sortKey, setSortKey] = useState<SortKey>('recent')
+
+  // 문서 검색어 (제목 + 본문)
+  const [query, setQuery] = useState('')
 
   // 탭
   const [tab, setTab] = useState<TabKey>('active')
@@ -298,7 +302,12 @@ export default function MyPagesPage() {
   const sortedPages = useMemo(() => {
     if (!pages) return null
     // 탭 필터: 활성/만료
-    const filtered = pages.filter((p) => (tab === 'active' ? isPageActive(p) : !isPageActive(p)))
+    let filtered = pages.filter((p) => (tab === 'active' ? isPageActive(p) : !isPageActive(p)))
+    // 문서 검색: 제목 + 본문(searchText) 부분 일치
+    const q = query.trim().toLowerCase()
+    if (q) {
+      filtered = filtered.filter((p) => (p.searchText ?? p.title).toLowerCase().includes(q))
+    }
     const arr = [...filtered]
     switch (sortKey) {
       case 'recent':
@@ -315,7 +324,7 @@ export default function MyPagesPage() {
           return new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime()
         })
     }
-  }, [pages, sortKey, tab])
+  }, [pages, sortKey, tab, query])
 
   // ── 호버 미리보기 핸들러 ─────────────────────────────────────
   const handleHoverEnter = (e: React.MouseEvent<HTMLElement>, p: Page) => {
@@ -438,6 +447,26 @@ export default function MyPagesPage() {
               </div>
             )}
 
+            {/* ── 문서 검색 ────────────────────────────────────── */}
+            {pages && pages.length > 0 && (
+              <div className="relative mb-3">
+                <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="text-popup-muted">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+                    <path d="M20 20l-3-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="제목·내용으로 내 페이지 검색…"
+                  aria-label="내 페이지 검색"
+                  className="w-full rounded-lg border border-popup-border bg-popup-white py-2.5 pl-9 pr-3 text-sm text-popup-text outline-none transition-colors focus:border-popup-accent"
+                />
+              </div>
+            )}
+
             {/* ── 탭 ───────────────────────────────────────────── */}
             {pages && pages.length > 0 && (
               <div role="tablist" aria-label="페이지 상태" className="mb-4 flex items-center gap-1 border-b border-popup-border">
@@ -491,7 +520,9 @@ export default function MyPagesPage() {
             {pages && pages.length > 0 && sortedPages && sortedPages.length === 0 && (
               <div className="rounded-xl border border-popup-border bg-popup-white py-12 text-center">
                 <p className="text-sm text-popup-muted">
-                  {tab === 'active' ? '활성 상태인 페이지가 없어요.' : '만료된 페이지가 없어요.'}
+                  {query.trim()
+                    ? `'${query.trim()}'에 대한 검색 결과가 없어요.`
+                    : tab === 'active' ? '활성 상태인 페이지가 없어요.' : '만료된 페이지가 없어요.'}
                 </p>
               </div>
             )}
