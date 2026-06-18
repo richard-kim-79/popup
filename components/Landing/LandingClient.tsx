@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Modal from '@/components/UI/Modal'
 
 const REF_KEY = 'popup_ref'
 
@@ -11,8 +10,6 @@ export default function LandingClient() {
   const [creating, setCreating] = useState(false)
   const [htmlUploading, setHtmlUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
-  const [showHtmlModal, setShowHtmlModal] = useState(false)
-  const [modalDragOver, setModalDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── 유입 출처(ref) 보존 + 유입 이벤트 비콘 — 채널별 전환 측정 ──
@@ -125,18 +122,8 @@ export default function LandingClient() {
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setShowHtmlModal(false)
-      void handleHtmlFile(file)
-    }
-    e.target.value = ''
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
-    const file = e.dataTransfer.files?.[0]
     if (file) void handleHtmlFile(file)
+    e.target.value = ''
   }
 
   const isLoading = creating || htmlUploading
@@ -163,13 +150,20 @@ export default function LandingClient() {
         {creating ? '만드는 중…' : '새 팝업 페이지 만들기'}
       </button>
 
-      {/* ── HTML 업로드 진입 (텍스트 링크 → 모달) ─────────────── */}
+      {/* ── HTML 업로드 진입 (점선 드롭존 — 클릭/드래그) ──────── */}
       <button
-        onClick={() => !isLoading && setShowHtmlModal(true)}
+        onClick={() => !isLoading && fileInputRef.current?.click()}
         disabled={isLoading}
-        className="mt-3 max-w-xs text-center text-sm text-popup-muted underline-offset-2 hover:text-popup-accent hover:underline transition-colors disabled:opacity-50"
+        className="group mt-5 w-full max-w-xs rounded-xl border-2 border-dashed border-popup-border bg-popup-surface/40 px-5 py-4 text-center transition-colors hover:border-popup-accent hover:bg-popup-accent-bg disabled:opacity-50"
       >
-        {htmlUploading ? 'HTML 업로드 중…' : '인공지능으로 만든 웹페이지 쉽게 공유해보세요'}
+        <span className="block text-sm font-medium text-popup-text">
+          📄 AI가 만든 HTML, 끌어다 놓거나 클릭
+        </span>
+        <span className="mt-0.5 block text-xs text-popup-muted">
+          {htmlUploading
+            ? 'HTML 업로드 중…'
+            : '변형 없이 그대로 공유 링크로 · .html 최대 500KB'}
+        </span>
       </button>
 
       <input
@@ -179,50 +173,6 @@ export default function LandingClient() {
         onChange={handleFileInput}
         className="hidden"
       />
-
-      {/* ── HTML 파일 업로드 모달 ────────────────────────────── */}
-      {showHtmlModal && (
-        <Modal onClose={() => !htmlUploading && setShowHtmlModal(false)} maxWidth={420}>
-          <div className="text-center">
-            <p className="mb-3 text-3xl">📄</p>
-            <p className="mb-1 text-base font-semibold text-popup-text">HTML 파일 업로드</p>
-            <p className="mb-5 text-xs text-popup-muted">
-              AI가 만든 HTML을 변형 없이 그대로 공유 링크로
-            </p>
-
-            {/* 드롭존 */}
-            <div
-              onDragOver={(e) => { e.preventDefault(); setModalDragOver(true) }}
-              onDragLeave={() => setModalDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setModalDragOver(false)
-                const file = e.dataTransfer.files?.[0]
-                if (file) {
-                  setShowHtmlModal(false)
-                  void handleHtmlFile(file)
-                }
-              }}
-              onClick={() => !htmlUploading && fileInputRef.current?.click()}
-              className={`mb-3 cursor-pointer rounded-xl border-2 border-dashed px-6 py-10 transition-colors ${
-                modalDragOver
-                  ? 'border-popup-accent bg-popup-accent-bg'
-                  : 'border-popup-border bg-popup-surface/40 hover:border-popup-accent hover:bg-popup-accent-bg'
-              } ${htmlUploading ? 'pointer-events-none opacity-50' : ''}`}
-            >
-              <p className="mb-1 text-sm font-medium text-popup-text">
-                파일을 여기에 놓거나 클릭해서 선택
-              </p>
-              <p className="text-xs text-popup-muted">.html · 최대 500KB</p>
-            </div>
-
-            <p className="text-[11px] text-popup-faint">
-              파일 업로드 후 자동으로 공유 링크가 만들어져요
-            </p>
-          </div>
-        </Modal>
-      )}
 
       {/* ── 로딩 오버레이 ─────────────────────────────────────── */}
       {isLoading && (
