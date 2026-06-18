@@ -86,8 +86,8 @@ export default function LandingClient() {
       alert('.html 또는 .htm 파일만 업로드할 수 있습니다.')
       return
     }
-    if (file.size > 500_000) {
-      alert('HTML 파일은 500KB 이하여야 합니다.')
+    if (file.size > 5_000_000) {
+      alert('HTML 파일은 5MB 이하여야 합니다.')
       return
     }
 
@@ -136,7 +136,7 @@ export default function LandingClient() {
           <div className="rounded-2xl border-2 border-dashed border-popup-accent bg-popup-white/90 px-12 py-8 text-center shadow-xl">
             <p className="text-4xl mb-3">📄</p>
             <p className="text-base font-semibold text-popup-accent">HTML 파일을 놓으세요</p>
-            <p className="mt-1 text-xs text-popup-muted">.html · 최대 500KB</p>
+            <p className="mt-1 text-xs text-popup-muted">.html</p>
           </div>
         </div>
       )}
@@ -162,7 +162,7 @@ export default function LandingClient() {
         <span className="mt-0.5 block text-xs text-popup-muted">
           {htmlUploading
             ? 'HTML 업로드 중…'
-            : '끌어다 놓거나 클릭 · 최대 500KB'}
+            : '끌어다 놓거나 클릭'}
         </span>
       </button>
 

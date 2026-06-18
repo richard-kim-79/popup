@@ -132,13 +132,13 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
     'create_html_page',
     'Creates a Popup page from raw HTML. Renders fullscreen exactly as-is — use for presentations, reports, visualizations, custom designs. IMPORTANT: Do NOT call this tool until the user has explicitly told you their PIN. Ask first: "편집 비밀번호(PIN)를 4자리 이상으로 정해주세요."',
     {
-      html: z.string().min(1).max(500_000).describe('Complete HTML content to publish (max 500 KB)'),
+      html: z.string().min(1).max(5_000_000).describe('Complete HTML content to publish (max 5 MB)'),
       pin: z.string().min(4).max(8).describe('4–8 digit PIN chosen by the user. Always ask the user before calling.'),
     },
     { readOnlyHint: false, destructiveHint: false },
     async ({ html, pin }) => {
-      if (Buffer.byteLength(html, 'utf8') > 500_000) {
-        return { content: [{ type: 'text' as const, text: 'HTML 크기가 500KB를 초과합니다.' }], isError: true }
+      if (Buffer.byteLength(html, 'utf8') > 5_000_000) {
+        return { content: [{ type: 'text' as const, text: 'HTML 크기가 5MB를 초과합니다.' }], isError: true }
       }
 
       const slug = await generateUniqueSlug()

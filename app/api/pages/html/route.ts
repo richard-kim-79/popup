@@ -8,7 +8,7 @@ import { normalizeSource } from '@/lib/source'
 import { logPageEvent } from '@/lib/events'
 import type { CreatePageResponse, ApiError } from '@/types'
 
-const MAX_HTML_BYTES = 500_000 // 500 KB
+const MAX_HTML_BYTES = 5_000_000 // 5 MB
 
 export async function POST(
   req: NextRequest,
@@ -29,7 +29,7 @@ export async function POST(
     return NextResponse.json({ error: 'html 필드가 필요합니다.' }, { status: 400 })
   }
   if (Buffer.byteLength(body.html, 'utf8') > MAX_HTML_BYTES) {
-    return NextResponse.json({ error: 'HTML 크기는 500KB를 초과할 수 없습니다.' }, { status: 400 })
+    return NextResponse.json({ error: 'HTML 크기는 5MB를 초과할 수 없습니다.' }, { status: 400 })
   }
 
   // 로그인 세션이 있으면 user_id 자동 연결
