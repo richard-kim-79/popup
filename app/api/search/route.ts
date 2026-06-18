@@ -53,16 +53,14 @@ export async function GET(
     return NextResponse.json({ pages: toResults(ftsData) })
   }
 
-  // ③ fallback: ILIKE 부분 문자열 검색
-  //    (한글 복합어, 오타, 초성 검색 등 tsvector 미매칭 케이스 대응)
+  // ③ fallback: ILIKE 부분 문자열 검색 — search_text(제목+설명+블록+HTML 본문) 대상
+  //    (한글 복합어 내부 부분일치, 오타 등 tsvector 미매칭 케이스 대응. trigram 인덱스로 가속)
   const { data: likeData, error: likeError } = await supabase
     .from('pages')
     .select('slug, listing_title, listing_description, listed_at')
     .eq('listed', true)
     .is('deleted_at', null)
-    .or(
-      `listing_title.ilike.%${q}%,listing_description.ilike.%${q}%`
-    )
+    .ilike('search_text', `%${q.toLowerCase()}%`)
     .order('listed_at', { ascending: false })
     .limit(24)
 
