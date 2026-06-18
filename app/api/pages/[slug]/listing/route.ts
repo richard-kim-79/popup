@@ -34,7 +34,7 @@ export async function PATCH(
   const admin = getSupabaseAdmin()
   const { data: page } = await admin
     .from('pages')
-    .select('user_id, blocks, deleted_at')
+    .select('user_id, blocks, html_content, deleted_at')
     .eq('slug', slug)
     .single()
 
@@ -46,7 +46,7 @@ export async function PATCH(
   }
 
   if (body.listed) {
-    const { title, description } = deriveListing(page.blocks)
+    const { title, description } = deriveListing(page.blocks, page.html_content)
     const { error } = await admin
       .from('pages')
       .update({
