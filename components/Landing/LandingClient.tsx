@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Modal from '@/components/UI/Modal'
-import { templates } from '@/lib/templates'
 
 const REF_KEY = 'popup_ref'
 
@@ -73,26 +72,6 @@ export default function LandingClient() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin: tempPin, blocks: [], source: getSource() }),
-    })
-    const data = await res.json() as { slug?: string; editToken?: string; error?: string }
-    if (!res.ok || !data.slug) {
-      alert(data.error ?? '페이지 생성에 실패했습니다.')
-      setCreating(false)
-      return
-    }
-    localStorage.setItem(`popup_token_${data.slug}`, data.editToken ?? '')
-    router.push(`/${data.slug}/edit`)
-  }
-
-  // ── 템플릿으로 시작 ────────────────────────────────────────────
-  const handleTemplate = async (templateId: string) => {
-    if (creating || htmlUploading) return
-    setCreating(true)
-    const tempPin = Math.floor(100000 + Math.random() * 900000).toString()
-    const res = await fetch('/api/pages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: tempPin, templateId, source: getSource() }),
     })
     const data = await res.json() as { slug?: string; editToken?: string; error?: string }
     if (!res.ok || !data.slug) {
@@ -192,24 +171,6 @@ export default function LandingClient() {
       >
         {htmlUploading ? 'HTML 업로드 중…' : '인공지능으로 만든 웹페이지 쉽게 공유해보세요'}
       </button>
-
-      {/* ── 템플릿으로 시작 (생성 장벽 낮추기) ─────────────────── */}
-      <div className="mt-8 w-full max-w-md">
-        <p className="mb-2.5 text-center text-xs text-popup-faint">또는 템플릿으로 빠르게 시작</p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {templates.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => void handleTemplate(t.id)}
-              disabled={isLoading}
-              title={t.description}
-              className="rounded-full border border-popup-border bg-popup-white px-3.5 py-1.5 text-xs text-popup-text transition-colors hover:border-popup-accent hover:text-popup-accent disabled:opacity-50"
-            >
-              {t.name}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <input
         ref={fileInputRef}

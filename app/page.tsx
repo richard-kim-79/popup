@@ -114,10 +114,14 @@ export default function LandingPage() {
 
       {/* 히어로 */}
       <div className="flex flex-1 flex-col items-center justify-center px-6 pb-40 pt-64 text-center">
-        <h1 className="mb-10 max-w-md text-[1.75rem] font-bold leading-[1.18] tracking-[-0.04em] text-popup-text sm:text-[2.6rem]">
-          로그인 없이<br />
-          웹페이지 만들고 공유
+        <h1 className="mb-4 max-w-md text-[1.75rem] font-bold leading-[1.18] tracking-[-0.04em] text-popup-text sm:text-[2.6rem]">
+          웹페이지, 만들면<br />
+          링크 하나로 바로 공유
         </h1>
+        <p className="mb-10 max-w-xs text-sm leading-relaxed text-popup-muted sm:max-w-sm sm:text-base">
+          로그인 없이 30초 만에. 카카오톡·인스타·문자 어디든
+          붙여넣어 공유하세요.
+        </p>
         <LandingClient />
       </div>
 
