@@ -157,12 +157,12 @@ export default function LandingClient() {
         className="group mt-5 w-full max-w-xs rounded-xl border-2 border-dashed border-popup-border bg-popup-surface/40 px-5 py-4 text-center transition-colors hover:border-popup-accent hover:bg-popup-accent-bg disabled:opacity-50"
       >
         <span className="block text-sm font-medium text-popup-text">
-          📄 AI가 만든 HTML, 끌어다 놓거나 클릭
+          📄 HTML 올려서 바로 공유
         </span>
         <span className="mt-0.5 block text-xs text-popup-muted">
           {htmlUploading
             ? 'HTML 업로드 중…'
-            : '변형 없이 그대로 공유 링크로 · .html 최대 500KB'}
+            : '끌어다 놓거나 클릭 · 최대 500KB'}
         </span>
       </button>
 
