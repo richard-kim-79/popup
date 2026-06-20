@@ -2,11 +2,11 @@
  * Remote MCP Server — popup2026.com/api/mcp
  *
  * Claude.ai 또는 Claude Desktop에서 URL만 추가하면 바로 사용 가능.
- * API 키 불필요 — 익명으로 페이지 생성 가능.
  *
- * 연결 방법:
- *   Claude.ai → 설정 → 통합(Integrations) → URL 추가:
- *   https://popup2026.com/api/mcp
+ * 익명(기본): https://popup2026.com/api/mcp — 페이지가 계정에 귀속되지 않음.
+ * 개인 연결: https://popup2026.com/api/mcp?key=lf_live_... (또는 Authorization: Bearer)
+ *   → 키 발급자(로그인 사용자) 계정에 자동 귀속되어 /my-pages 에서 관리됨.
+ *   키 발급: /my-pages → "Claude(MCP) 연결".
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
@@ -15,10 +15,19 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { generateUniqueSlug } from '@/lib/slug'
+import { resolveApiKeyUserId } from '@/lib/api-key-middleware'
 import { nanoid } from 'nanoid'
 import type { Json } from '@/types'
 
 export const runtime = 'nodejs'
+
+/** 요청에서 개인 키(?key= 또는 Authorization: Bearer) → 발급자 user_id 해석 */
+async function mcpAuth(req: NextRequest): Promise<{ userId: string; apiKeyId: string } | null> {
+  const fromQuery = req.nextUrl.searchParams.get('key')
+  const authHeader = req.headers.get('authorization')
+  const fromHeader = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
+  return resolveApiKeyUserId(fromQuery ?? fromHeader)
+}
 
 const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com').trim()
 const DEFAULT_DAYS = 30
@@ -43,7 +52,10 @@ const BlockSchema = z.object({
 })
 
 // ── McpServer 팩토리 ───────────────────────────────────────────
-function buildServer(): McpServer {
+// auth: 개인 키로 연결한 경우 발급자 user_id — 생성 페이지를 그 계정에 귀속
+function buildServer(auth?: { userId: string; apiKeyId: string } | null): McpServer {
+  const ownerUserId = auth?.userId ?? null
+  const ownerApiKeyId = auth?.apiKeyId ?? null
   const server = new McpServer(
     {
       name: 'popup',
@@ -103,7 +115,8 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
         expires_at,
         delete_at,
         locked: false,
-        user_id: null,
+        user_id: ownerUserId,
+        api_key_id: ownerApiKeyId,
       })
 
       if (error) {
@@ -155,7 +168,8 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
         expires_at,
         delete_at,
         locked: false,
-        user_id: null,
+        user_id: ownerUserId,
+        api_key_id: ownerApiKeyId,
       })
 
       if (error) {
@@ -310,32 +324,17 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
 }
 
 // ── Route Handler ──────────────────────────────────────────────
-export async function POST(req: NextRequest): Promise<Response> {
+async function handle(req: NextRequest): Promise<Response> {
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless — Vercel serverless 호환
   })
 
-  const server = buildServer()
+  const auth = await mcpAuth(req)
+  const server = buildServer(auth)
   await server.connect(transport)
   return transport.handleRequest(req)
 }
 
-export async function GET(req: NextRequest): Promise<Response> {
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-  })
-
-  const server = buildServer()
-  await server.connect(transport)
-  return transport.handleRequest(req)
-}
-
-export async function DELETE(req: NextRequest): Promise<Response> {
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-  })
-
-  const server = buildServer()
-  await server.connect(transport)
-  return transport.handleRequest(req)
-}
+export const POST = handle
+export const GET = handle
+export const DELETE = handle

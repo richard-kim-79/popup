@@ -123,3 +123,34 @@ export function isApiError(
 ): result is NextResponse<ApiV1Error> {
   return result instanceof NextResponse
 }
+
+/**
+ * raw 키 → 발급자(user_id) + 키 id 해석 (MCP 인증용).
+ * 유효하지 않거나(형식·폐기·만료) 사용자에 연결되지 않은 키면 null.
+ * MCP는 페이지 귀속만 필요하므로 scope/rate limit은 보지 않는다.
+ */
+export async function resolveApiKeyUserId(
+  rawKey: string | null | undefined,
+): Promise<{ userId: string; apiKeyId: string } | null> {
+  if (!rawKey || !rawKey.startsWith('lf_live_')) return null
+
+  const keyHash = hashApiKey(rawKey)
+  const supabase = getSupabaseAdmin()
+
+  const { data, error } = await supabase
+    .from('api_keys')
+    .select('id, user_id, revoked_at, expires_at')
+    .eq('key_hash', keyHash)
+    .maybeSingle()
+
+  if (error || !data || !data.user_id) return null
+  if (data.revoked_at) return null
+  if (data.expires_at && new Date(data.expires_at) < new Date()) return null
+
+  void supabase
+    .from('api_keys')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', data.id)
+
+  return { userId: data.user_id, apiKeyId: data.id }
+}

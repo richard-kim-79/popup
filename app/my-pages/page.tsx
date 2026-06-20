@@ -9,6 +9,7 @@ import ExpireNowModal from '@/components/Modal/ExpireNowModal'
 import ExtendLifespanModal from '@/components/Modal/ExtendLifespanModal'
 import SubscriptionStatus from '@/components/MyPages/SubscriptionStatus'
 import UsageCard from '@/components/MyPages/UsageCard'
+import McpConnect from '@/components/MyPages/McpConnect'
 
 interface Page {
   slug: string
@@ -444,6 +445,7 @@ export default function MyPagesPage() {
               <div className="mb-2">
                 <SubscriptionStatus />
                 <UsageCard />
+                <McpConnect />
               </div>
             )}
 

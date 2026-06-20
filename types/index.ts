@@ -501,6 +501,7 @@ export type Database = {
           last_used_at: string | null
           revoked_at: string | null
           expires_at: string | null
+          user_id: string | null
         }
         Insert: {
           id?: string
@@ -513,6 +514,7 @@ export type Database = {
           last_used_at?: string | null
           revoked_at?: string | null
           expires_at?: string | null
+          user_id?: string | null
         }
         Update: {
           id?: string
@@ -525,6 +527,7 @@ export type Database = {
           last_used_at?: string | null
           revoked_at?: string | null
           expires_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
