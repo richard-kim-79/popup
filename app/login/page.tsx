@@ -25,10 +25,13 @@ function LoginInner() {
     // 돌아와야 한다. NEXT_PUBLIC_BASE_URL(정식 도메인)이 현재 호스트와 다르면(apex↔www,
     // vercel.app 등) 쿠키가 콜백 요청에 실리지 않아 "PKCE code verifier not found"가 발생.
     const baseUrl = window.location.origin.replace(/\/$/, '')
+    // 로그인 후 복귀 경로 — 동일 오리진 경로만 허용(open-redirect 방지). 기본 /my-pages
+    const rawNext = searchParams.get('next')
+    const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/my-pages'
     const { error: e } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${baseUrl}/auth/callback?next=/my-pages`,
+        redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })
     if (e) {

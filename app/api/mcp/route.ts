@@ -16,17 +16,54 @@ import { z } from 'zod'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { generateUniqueSlug } from '@/lib/slug'
 import { resolveApiKeyUserId } from '@/lib/api-key-middleware'
+import { sha256, MCP_RESOURCE, wwwAuthenticate } from '@/lib/oauth'
 import { nanoid } from 'nanoid'
 import type { Json } from '@/types'
 
 export const runtime = 'nodejs'
 
-/** 요청에서 개인 키(?key= 또는 Authorization: Bearer) → 발급자 user_id 해석 */
-async function mcpAuth(req: NextRequest): Promise<{ userId: string; apiKeyId: string } | null> {
-  const fromQuery = req.nextUrl.searchParams.get('key')
+type McpAuth = { userId: string; apiKeyId: string | null }
+
+/** OAuth 액세스 토큰(Bearer) → user_id (미만료·미폐기·audience 일치) */
+async function resolveOAuthToken(token: string): Promise<string | null> {
+  const admin = getSupabaseAdmin()
+  const { data } = await admin
+    .from('oauth_tokens')
+    .select('user_id, access_expires_at, audience')
+    .eq('access_hash', sha256(token))
+    .is('revoked_at', null)
+    .maybeSingle()
+  if (!data) return null
+  if (data.access_expires_at && new Date(data.access_expires_at) < new Date()) return null
+  if (data.audience && data.audience !== MCP_RESOURCE) return null
+  return data.user_id
+}
+
+/**
+ * 요청 인증 → 발급자 user_id 해석.
+ *  ① 개인 키(lf_live_): ?key= 쿼리 또는 Bearer
+ *  ② OAuth 액세스 토큰: Bearer (lf_live_ 아님)
+ * 인증 실패 시 null (호출부에서 401 챌린지).
+ */
+async function mcpAuth(req: NextRequest): Promise<McpAuth | null> {
   const authHeader = req.headers.get('authorization')
-  const fromHeader = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
-  return resolveApiKeyUserId(fromQuery ?? fromHeader)
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
+  const queryKey = req.nextUrl.searchParams.get('key')
+
+  // ① 개인 키
+  const apiKeyRaw = queryKey ?? (bearer?.startsWith('lf_live_') ? bearer : null)
+  if (apiKeyRaw) {
+    const r = await resolveApiKeyUserId(apiKeyRaw)
+    if (r) return { userId: r.userId, apiKeyId: r.apiKeyId }
+  }
+
+  // ② OAuth 액세스 토큰
+  if (bearer && !bearer.startsWith('lf_live_')) {
+    const userId = await resolveOAuthToken(bearer)
+    if (userId) return { userId, apiKeyId: null }
+  }
+
+  return null
 }
 
 const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com').trim()
@@ -52,8 +89,8 @@ const BlockSchema = z.object({
 })
 
 // ── McpServer 팩토리 ───────────────────────────────────────────
-// auth: 개인 키로 연결한 경우 발급자 user_id — 생성 페이지를 그 계정에 귀속
-function buildServer(auth?: { userId: string; apiKeyId: string } | null): McpServer {
+// auth: 인증된 경우 발급자 user_id — 생성 페이지를 그 계정에 귀속
+function buildServer(auth?: McpAuth | null): McpServer {
   const ownerUserId = auth?.userId ?? null
   const ownerApiKeyId = auth?.apiKeyId ?? null
   const server = new McpServer(
@@ -325,11 +362,25 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
 
 // ── Route Handler ──────────────────────────────────────────────
 async function handle(req: NextRequest): Promise<Response> {
+  const auth = await mcpAuth(req)
+
+  // 인증 없으면 401 + WWW-Authenticate → Claude가 OAuth(구글 로그인) 플로우 시작
+  if (!auth) {
+    return new Response(
+      JSON.stringify({ error: 'unauthorized', error_description: '로그인이 필요합니다.' }),
+      {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'WWW-Authenticate': wwwAuthenticate(),
+        },
+      },
+    )
+  }
+
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless — Vercel serverless 호환
   })
-
-  const auth = await mcpAuth(req)
   const server = buildServer(auth)
   await server.connect(transport)
   return transport.handleRequest(req)

@@ -562,6 +562,108 @@ export type Database = {
           }
         ]
       }
+      oauth_clients: {
+        Row: {
+          client_id: string
+          redirect_uris: string[]
+          client_name: string | null
+          created_at: string
+        }
+        Insert: {
+          client_id: string
+          redirect_uris?: string[]
+          client_name?: string | null
+          created_at?: string
+        }
+        Update: {
+          client_id?: string
+          redirect_uris?: string[]
+          client_name?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      oauth_codes: {
+        Row: {
+          code_hash: string
+          client_id: string
+          user_id: string
+          redirect_uri: string
+          code_challenge: string
+          resource: string | null
+          scope: string | null
+          expires_at: string
+          used: boolean
+          created_at: string
+        }
+        Insert: {
+          code_hash: string
+          client_id: string
+          user_id: string
+          redirect_uri: string
+          code_challenge: string
+          resource?: string | null
+          scope?: string | null
+          expires_at: string
+          used?: boolean
+          created_at?: string
+        }
+        Update: {
+          code_hash?: string
+          client_id?: string
+          user_id?: string
+          redirect_uri?: string
+          code_challenge?: string
+          resource?: string | null
+          scope?: string | null
+          expires_at?: string
+          used?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      oauth_tokens: {
+        Row: {
+          id: string
+          access_hash: string | null
+          refresh_hash: string | null
+          user_id: string
+          client_id: string
+          audience: string | null
+          scope: string | null
+          access_expires_at: string | null
+          refresh_expires_at: string | null
+          revoked_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          access_hash?: string | null
+          refresh_hash?: string | null
+          user_id: string
+          client_id: string
+          audience?: string | null
+          scope?: string | null
+          access_expires_at?: string | null
+          refresh_expires_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          access_hash?: string | null
+          refresh_hash?: string | null
+          user_id?: string
+          client_id?: string
+          audience?: string | null
+          scope?: string | null
+          access_expires_at?: string | null
+          refresh_expires_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
