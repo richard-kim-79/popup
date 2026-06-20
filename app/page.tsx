@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import Nav from '@/components/Landing/Nav'
-import PricingTeaser from '@/components/Landing/PricingTeaser'
 import ClaudeSection from '@/components/Landing/ClaudeSection'
 import Footer from '@/components/Landing/Footer'
 import LandingClient from '@/components/Landing/LandingClient'
@@ -121,7 +120,6 @@ export default function LandingPage() {
         <LandingClient />
       </div>
 
-      <PricingTeaser />
       <ClaudeSection />
       <Footer />
     </div>

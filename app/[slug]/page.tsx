@@ -3,11 +3,9 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import ReportButton from '@/components/ReportButton'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
-import { daysLeft } from '@/lib/slug'
 import { extractHtmlMeta } from '@/lib/html-meta'
 import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
 import SocialEmbed from '@/components/Blocks/SocialEmbed'
-import ExpiryUpgradeButton from '@/components/Viewer/ExpiryUpgradeButton'
 import LockedBanner from '@/components/Viewer/LockedBanner'
 import MadeWithPopup from '@/components/Viewer/MadeWithPopup'
 
@@ -346,7 +344,6 @@ export default async function ViewerPage({ params }: Props) {
 
   const isHidden = (data.report_count ?? 0) >= REPORT_HIDE_THRESHOLD
   const blocks = (data.blocks as unknown) as Block[]
-  const remaining = daysLeft(data.expires_at)
   // DB locked 또는 expires_at 경과 시 잠금 처리 (크론 미실행 방어)
   // 단, 페이지 소유자가 유료 구독자(Lite/Pro)면 만료 면제
   let exempt = false
@@ -480,8 +477,6 @@ export default async function ViewerPage({ params }: Props) {
           ) : (
             <>
               <Link href={`/${slug}/edit`} className="text-xs text-popup-faint hover:text-popup-muted">편집</Link>
-              <span className="text-popup-faint">·</span>
-              <ExpiryUpgradeButton slug={slug} remaining={remaining} />
               <span className="text-popup-faint">·</span>
               <ReportButton slug={slug} />
               {/* '지금 만료'는 공유 페이지 푸터에서 제거 — 소유자는 /my-pages에서 관리 */}
