@@ -64,11 +64,10 @@ export default function LandingClient() {
   // ── 블록 페이지 생성 ───────────────────────────────────────────
   const handleCreate = async () => {
     setCreating(true)
-    const tempPin = Math.floor(100000 + Math.random() * 900000).toString()
     const res = await fetch('/api/pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: tempPin, blocks: [], source: getSource() }),
+      body: JSON.stringify({ blocks: [], source: getSource() }),
     })
     const data = await res.json() as { slug?: string; editToken?: string; error?: string }
     if (!res.ok || !data.slug) {
@@ -101,11 +100,10 @@ export default function LandingClient() {
     })
 
     // 임시 PIN — 공유 버튼 클릭 시 진짜 PIN으로 교체
-    const tempPin = Math.floor(100000 + Math.random() * 900000).toString()
     const res = await fetch('/api/pages/html', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: tempPin, html, source: getSource() }),
+      body: JSON.stringify({ html, source: getSource() }),
     })
 
     const data = await res.json() as { slug?: string; editToken?: string; error?: string }
@@ -116,7 +114,6 @@ export default function LandingClient() {
     }
 
     localStorage.setItem(`popup_token_${data.slug}`, data.editToken ?? '')
-    // popup_pin_set_${slug} 미설정 → ShareModal에서 PIN 설정 유도
     router.push(`/${data.slug}/edit`)
   }
 

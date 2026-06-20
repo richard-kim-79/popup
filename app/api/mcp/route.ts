@@ -74,17 +74,12 @@ function assignIds(blocks: Record<string, unknown>[]): Json {
   return blocks.map((b) => ({ id: nanoid(6), ...b })) as Json
 }
 
-// 휴대용 PIN 미지정 시 자동 생성 (소유자는 계정으로 편집하므로 노출 불필요)
+// pin_hash 컬럼 채움용 임의 PIN (PIN 기능 제거 — 노출/사용 안 함, 편집은 계정/토큰)
 function randomPin(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
 }
 
-/** 생성 결과의 편집 안내 문구 — PIN 지정 시 PIN, 아니면 계정 편집 안내 */
-function editHint(pin: string | undefined): string {
-  return pin
-    ? `🔑 편집 PIN: ${pin}  ← 사용자에게 알려주세요`
-    : `✏️ 편집: 로그인한 내 계정의 /my-pages 에서 PIN 없이 편집할 수 있어요`
-}
+const EDIT_HINT = `✏️ 편집: 로그인한 내 계정의 /my-pages 에서 편집할 수 있어요`
 
 // ── 블록 스키마 (tools 공통) ───────────────────────────────────
 const BlockSchema = z.object({
@@ -120,10 +115,9 @@ function buildServer(auth?: McpAuth | null): McpServer {
       instructions: `
 Popup creates instant shareable web pages.
 
-## PIN (optional)
+## Account
 This connection is authenticated, so created pages are saved to the user's Popup account
-and can be edited from /my-pages without a PIN. Do NOT ask for a PIN by default.
-Only pass the pin argument if the user explicitly wants a portable edit PIN (to edit from a device where they are not logged in).
+and can be edited/managed from /my-pages. No PIN is involved — never ask for one.
 
 ## Page building guide
 - Block-based pages: use create_page with h1/h2/text/image/button/youtube/link/divider blocks.
@@ -143,16 +137,15 @@ Only pass the pin argument if the user explicitly wants a portable edit PIN (to 
   // ── Tool: create_page ────────────────────────────────────────
   server.tool(
     'create_page',
-    'Creates a new Popup page. The page is saved to the connected user\'s account and editable from /my-pages without a PIN. Do NOT ask for a PIN by default.',
+    'Creates a new Popup page. Saved to the connected user\'s account and editable from /my-pages. No PIN needed.',
     {
       blocks: z.array(BlockSchema).describe('페이지를 구성할 블록 배열'),
-      pin: z.string().min(4).max(8).optional().describe('(선택) 휴대용 편집 PIN. 보통 생략 — 계정에서 편집 가능. 사용자가 명시적으로 원할 때만.'),
     },
     { readOnlyHint: false, destructiveHint: false },
-    async ({ blocks, pin }) => {
+    async ({ blocks }) => {
       const slug = await generateUniqueSlug()
       const { hashPin } = await import('@/lib/pin')
-      const pin_hash = await hashPin(pin ?? randomPin())
+      const pin_hash = await hashPin(randomPin())
       const expires_at = new Date(Date.now() + DEFAULT_DAYS * 86400000).toISOString()
       const delete_at = new Date(Date.now() + 365 * 86400000).toISOString()
 
@@ -178,7 +171,7 @@ Only pass the pin argument if the user explicitly wants a portable edit PIN (to 
             `✅ 페이지가 생성됐습니다!`,
             ``,
             `🔗 URL: ${BASE}/${slug}`,
-            editHint(pin),
+            EDIT_HINT,
             `📅 유효기간: ${DEFAULT_DAYS}일`,
             ``,
             `편집 링크: ${BASE}/${slug}/edit`,
@@ -194,17 +187,16 @@ Only pass the pin argument if the user explicitly wants a portable edit PIN (to 
     'Creates a Popup page from raw HTML. Renders fullscreen exactly as-is — use for presentations, reports, visualizations, custom designs. Saved to the connected user\'s account, editable from /my-pages without a PIN. Do NOT ask for a PIN by default.',
     {
       html: z.string().min(1).max(5_000_000).describe('Complete HTML content to publish (max 5 MB)'),
-      pin: z.string().min(4).max(8).optional().describe('(optional) portable edit PIN. Usually omit — editable from the account. Only when the user explicitly asks.'),
     },
     { readOnlyHint: false, destructiveHint: false },
-    async ({ html, pin }) => {
+    async ({ html }) => {
       if (Buffer.byteLength(html, 'utf8') > 5_000_000) {
         return { content: [{ type: 'text' as const, text: 'HTML 크기가 5MB를 초과합니다.' }], isError: true }
       }
 
       const slug = await generateUniqueSlug()
       const { hashPin } = await import('@/lib/pin')
-      const pin_hash = await hashPin(pin ?? randomPin())
+      const pin_hash = await hashPin(randomPin())
       const expires_at = new Date(Date.now() + DEFAULT_DAYS * 86400000).toISOString()
       const delete_at = new Date(Date.now() + 365 * 86400000).toISOString()
 
@@ -231,7 +223,7 @@ Only pass the pin argument if the user explicitly wants a portable edit PIN (to 
             `✅ HTML 페이지가 생성됐습니다!`,
             ``,
             `🔗 URL: ${BASE}/${slug}`,
-            editHint(pin),
+            EDIT_HINT,
             `📅 유효기간: ${DEFAULT_DAYS}일`,
             ``,
             `페이지를 열면 HTML이 풀스크린으로 표시됩니다.`,
@@ -277,17 +269,16 @@ Only pass the pin argument if the user explicitly wants a portable edit PIN (to 
   // ── Tool: update_page ────────────────────────────────────────
   server.tool(
     'update_page',
-    '기존 페이지의 블록 전체를 새 내용으로 교체합니다. 연결된 계정 소유 페이지는 PIN 없이 수정됩니다.',
+    '기존 페이지의 블록 전체를 새 내용으로 교체합니다. 연결된 계정이 소유한 페이지만 수정할 수 있습니다.',
     {
       slug: z.string().describe('페이지 슬러그'),
-      pin: z.string().optional().describe('(선택) 편집 PIN. 내 계정 소유 페이지면 생략 가능.'),
       blocks: z.array(BlockSchema).describe('새 블록 배열'),
     },
     { readOnlyHint: false, destructiveHint: false },
-    async ({ slug, pin, blocks }) => {
+    async ({ slug, blocks }) => {
       const { data: page } = await supabase
         .from('pages')
-        .select('pin_hash, user_id')
+        .select('user_id')
         .eq('slug', slug)
         .is('deleted_at', null)
         .single()
@@ -296,14 +287,10 @@ Only pass the pin argument if the user explicitly wants a portable edit PIN (to 
         return { content: [{ type: 'text' as const, text: '페이지를 찾을 수 없습니다.' }], isError: true }
       }
 
-      // 연결 계정이 소유자면 PIN 불필요, 아니면 PIN 검증
+      // 연결 계정이 소유자일 때만 수정 허용
       const isOwner = !!ownerUserId && page.user_id === ownerUserId
       if (!isOwner) {
-        const { verifyPin } = await import('@/lib/pin')
-        const valid = pin ? await verifyPin(pin, page.pin_hash) : false
-        if (!valid) {
-          return { content: [{ type: 'text' as const, text: 'PIN이 필요하거나 올바르지 않습니다.' }], isError: true }
-        }
+        return { content: [{ type: 'text' as const, text: '이 페이지를 수정할 권한이 없습니다(소유자만 가능).' }], isError: true }
       }
 
       const { error } = await supabase

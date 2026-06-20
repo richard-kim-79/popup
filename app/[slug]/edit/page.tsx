@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Editor from '@/components/Editor'
-import PinModal from '@/components/Modal/PinModal'
 import ShareModal from '@/components/Modal/ShareModal'
 import type { Block } from '@/types'
 
@@ -18,7 +17,6 @@ export default function EditPage() {
   const { slug } = useParams<{ slug: string }>()
   const [pageData, setPageData] = useState<PageData | null>(null)
   const [editToken, setEditToken] = useState<string | null>(null)
-  const [showPin, setShowPin] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -34,26 +32,20 @@ export default function EditPage() {
       if (stored) {
         setEditToken(stored)
       } else {
-        // 로그인 소유자면 PIN 없이 토큰 발급 (소유 확인은 서버에서)
+        // 만든 브라우저 토큰이 없으면 — 로그인 소유자면 토큰 발급, 아니면 편집 불가
         const ot = await fetch(`/api/pages/${slug}/owner-token`, { method: 'POST' })
         if (ot.ok) {
           const { editToken: t } = await ot.json() as { editToken: string }
           localStorage.setItem(`popup_token_${slug}`, t)
           setEditToken(t)
         } else {
-          setShowPin(true)
+          setError('이 페이지를 편집할 권한이 없어요. 만든 기기(브라우저)에서 열거나, 소유자라면 로그인 후 다시 시도하세요.')
         }
       }
       setLoading(false)
     }
     load()
   }, [slug])
-
-  const handlePinConfirm = (token: string) => {
-    localStorage.setItem(`popup_token_${slug}`, token)
-    setEditToken(token)
-    setShowPin(false)
-  }
 
   if (loading) return (
     <div className="flex min-h-screen items-center justify-center text-sm text-popup-muted">
@@ -92,18 +84,7 @@ export default function EditPage() {
     </>
   )
 
-  if (!editToken || !pageData) return (
-    <>
-      {showPin && (
-        <PinModal
-          mode="enter"
-          slug={slug}
-          onConfirm={handlePinConfirm}
-          onClose={() => { window.location.href = `/${slug}` }}
-        />
-      )}
-    </>
-  )
+  if (!editToken || !pageData) return null
 
   return (
     <Editor

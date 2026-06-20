@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin, getSupabaseServer } from '@/lib/supabase-server'
-import { hashPin } from '@/lib/pin'
+import { randomPinHash } from '@/lib/pin'
 import { issueEditToken } from '@/lib/token'
 import { generateUniqueSlug } from '@/lib/slug'
 import { checkStorageQuota } from '@/lib/subscription'
@@ -11,11 +11,7 @@ import { logPageEvent } from '@/lib/events'
 import type { CreatePageResponse, ApiError, Json } from '@/types'
 
 export async function POST(req: NextRequest): Promise<NextResponse<CreatePageResponse | ApiError>> {
-  const body = await req.json().catch(() => null)
-
-  if (!body?.pin || typeof body.pin !== 'string' || body.pin.length < 4 || body.pin.length > 8) {
-    return NextResponse.json({ error: 'PIN은 4~8자리여야 합니다.' }, { status: 400 })
-  }
+  const body = await req.json().catch(() => null) ?? {}
 
   // 템플릿으로 생성: templateId가 있으면 템플릿 블록으로 시작 (없으면 body.blocks)
   let blocks: Json = (body.blocks ?? []) as Json
@@ -47,7 +43,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CreatePageRes
   }
 
   const slug = await generateUniqueSlug()
-  const pin_hash = await hashPin(body.pin)
+  const pin_hash = await randomPinHash()
 
   const now = new Date()
   const expires_at = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()

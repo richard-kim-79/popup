@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin, getSupabaseServer } from '@/lib/supabase-server'
-import { hashPin } from '@/lib/pin'
+import { randomPinHash } from '@/lib/pin'
 import { issueEditToken } from '@/lib/token'
 import { generateUniqueSlug } from '@/lib/slug'
 import { checkStorageQuota } from '@/lib/subscription'
@@ -15,14 +15,8 @@ export async function POST(
 ): Promise<NextResponse<CreatePageResponse | ApiError>> {
   const body = await req.json().catch(() => null) as {
     html?: unknown
-    pin?: unknown
     source?: unknown
   } | null
-
-  // PIN 검증
-  if (!body?.pin || typeof body.pin !== 'string' || body.pin.length < 4 || body.pin.length > 8) {
-    return NextResponse.json({ error: 'PIN은 4~8자리여야 합니다.' }, { status: 400 })
-  }
 
   // HTML 검증
   if (!body?.html || typeof body.html !== 'string' || body.html.length === 0) {
@@ -50,7 +44,7 @@ export async function POST(
   }
 
   const slug = await generateUniqueSlug()
-  const pin_hash = await hashPin(body.pin)
+  const pin_hash = await randomPinHash()
 
   const now = new Date()
   const expires_at = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
