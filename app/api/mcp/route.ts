@@ -74,6 +74,18 @@ function assignIds(blocks: Record<string, unknown>[]): Json {
   return blocks.map((b) => ({ id: nanoid(6), ...b })) as Json
 }
 
+// 휴대용 PIN 미지정 시 자동 생성 (소유자는 계정으로 편집하므로 노출 불필요)
+function randomPin(): string {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
+/** 생성 결과의 편집 안내 문구 — PIN 지정 시 PIN, 아니면 계정 편집 안내 */
+function editHint(pin: string | undefined): string {
+  return pin
+    ? `🔑 편집 PIN: ${pin}  ← 사용자에게 알려주세요`
+    : `✏️ 편집: 로그인한 내 계정의 /my-pages 에서 PIN 없이 편집할 수 있어요`
+}
+
 // ── 블록 스키마 (tools 공통) ───────────────────────────────────
 const BlockSchema = z.object({
   type: z.enum(['h1', 'h2', 'text', 'image', 'button', 'divider', 'youtube', 'link']),
@@ -106,13 +118,12 @@ function buildServer(auth?: McpAuth | null): McpServer {
     },
     {
       instructions: `
-Popup creates instant shareable web pages — no login required.
+Popup creates instant shareable web pages.
 
-## ⚠️ MANDATORY RULE — ALWAYS FOLLOW BEFORE create_page OR create_html_page
-Before calling create_page or create_html_page, you MUST ask the user to choose their own edit PIN.
-Say exactly: "편집 비밀번호(PIN)를 4자리 이상으로 직접 정해주세요. 나중에 이 번호로 수정할 수 있어요."
-Wait for the user's reply. Use ONLY the PIN the user provides.
-NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
+## PIN (optional)
+This connection is authenticated, so created pages are saved to the user's Popup account
+and can be edited from /my-pages without a PIN. Do NOT ask for a PIN by default.
+Only pass the pin argument if the user explicitly wants a portable edit PIN (to edit from a device where they are not logged in).
 
 ## Page building guide
 - Block-based pages: use create_page with h1/h2/text/image/button/youtube/link/divider blocks.
@@ -132,16 +143,16 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
   // ── Tool: create_page ────────────────────────────────────────
   server.tool(
     'create_page',
-    'Creates a new Popup page. IMPORTANT: Do NOT call this tool until the user has explicitly told you their PIN. Ask first: "편집 비밀번호(PIN)를 4자리 이상으로 정해주세요."',
+    'Creates a new Popup page. The page is saved to the connected user\'s account and editable from /my-pages without a PIN. Do NOT ask for a PIN by default.',
     {
       blocks: z.array(BlockSchema).describe('페이지를 구성할 블록 배열'),
-      pin: z.string().min(4).max(8).describe('사용자가 직접 정한 4~8자리 편집 PIN. 반드시 사용자에게 먼저 물어보고 입력받으세요.'),
+      pin: z.string().min(4).max(8).optional().describe('(선택) 휴대용 편집 PIN. 보통 생략 — 계정에서 편집 가능. 사용자가 명시적으로 원할 때만.'),
     },
     { readOnlyHint: false, destructiveHint: false },
     async ({ blocks, pin }) => {
       const slug = await generateUniqueSlug()
       const { hashPin } = await import('@/lib/pin')
-      const pin_hash = await hashPin(pin)
+      const pin_hash = await hashPin(pin ?? randomPin())
       const expires_at = new Date(Date.now() + DEFAULT_DAYS * 86400000).toISOString()
       const delete_at = new Date(Date.now() + 365 * 86400000).toISOString()
 
@@ -167,7 +178,7 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
             `✅ 페이지가 생성됐습니다!`,
             ``,
             `🔗 URL: ${BASE}/${slug}`,
-            `🔑 편집 PIN: ${pin}  ← 사용자에게 꼭 알려주세요`,
+            editHint(pin),
             `📅 유효기간: ${DEFAULT_DAYS}일`,
             ``,
             `편집 링크: ${BASE}/${slug}/edit`,
@@ -180,10 +191,10 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
   // ── Tool: create_html_page ──────────────────────────────────
   server.tool(
     'create_html_page',
-    'Creates a Popup page from raw HTML. Renders fullscreen exactly as-is — use for presentations, reports, visualizations, custom designs. IMPORTANT: Do NOT call this tool until the user has explicitly told you their PIN. Ask first: "편집 비밀번호(PIN)를 4자리 이상으로 정해주세요."',
+    'Creates a Popup page from raw HTML. Renders fullscreen exactly as-is — use for presentations, reports, visualizations, custom designs. Saved to the connected user\'s account, editable from /my-pages without a PIN. Do NOT ask for a PIN by default.',
     {
       html: z.string().min(1).max(5_000_000).describe('Complete HTML content to publish (max 5 MB)'),
-      pin: z.string().min(4).max(8).describe('4–8 digit PIN chosen by the user. Always ask the user before calling.'),
+      pin: z.string().min(4).max(8).optional().describe('(optional) portable edit PIN. Usually omit — editable from the account. Only when the user explicitly asks.'),
     },
     { readOnlyHint: false, destructiveHint: false },
     async ({ html, pin }) => {
@@ -193,7 +204,7 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
 
       const slug = await generateUniqueSlug()
       const { hashPin } = await import('@/lib/pin')
-      const pin_hash = await hashPin(pin)
+      const pin_hash = await hashPin(pin ?? randomPin())
       const expires_at = new Date(Date.now() + DEFAULT_DAYS * 86400000).toISOString()
       const delete_at = new Date(Date.now() + 365 * 86400000).toISOString()
 
@@ -220,7 +231,7 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
             `✅ HTML 페이지가 생성됐습니다!`,
             ``,
             `🔗 URL: ${BASE}/${slug}`,
-            `🔑 편집 PIN: ${pin}  ← 사용자에게 꼭 알려주세요`,
+            editHint(pin),
             `📅 유효기간: ${DEFAULT_DAYS}일`,
             ``,
             `페이지를 열면 HTML이 풀스크린으로 표시됩니다.`,
@@ -266,18 +277,17 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
   // ── Tool: update_page ────────────────────────────────────────
   server.tool(
     'update_page',
-    'PIN을 사용해 기존 페이지의 블록 전체를 새 내용으로 교체합니다.',
+    '기존 페이지의 블록 전체를 새 내용으로 교체합니다. 연결된 계정 소유 페이지는 PIN 없이 수정됩니다.',
     {
       slug: z.string().describe('페이지 슬러그'),
-      pin: z.string().describe('4~8자리 편집 PIN'),
+      pin: z.string().optional().describe('(선택) 편집 PIN. 내 계정 소유 페이지면 생략 가능.'),
       blocks: z.array(BlockSchema).describe('새 블록 배열'),
     },
     { readOnlyHint: false, destructiveHint: false },
     async ({ slug, pin, blocks }) => {
-      // PIN 검증
       const { data: page } = await supabase
         .from('pages')
-        .select('pin_hash')
+        .select('pin_hash, user_id')
         .eq('slug', slug)
         .is('deleted_at', null)
         .single()
@@ -286,10 +296,14 @@ NEVER invent, guess, or auto-generate a PIN. NEVER skip this step.
         return { content: [{ type: 'text' as const, text: '페이지를 찾을 수 없습니다.' }], isError: true }
       }
 
-      const { verifyPin } = await import('@/lib/pin')
-      const valid = await verifyPin(pin, page.pin_hash)
-      if (!valid) {
-        return { content: [{ type: 'text' as const, text: 'PIN이 올바르지 않습니다.' }], isError: true }
+      // 연결 계정이 소유자면 PIN 불필요, 아니면 PIN 검증
+      const isOwner = !!ownerUserId && page.user_id === ownerUserId
+      if (!isOwner) {
+        const { verifyPin } = await import('@/lib/pin')
+        const valid = pin ? await verifyPin(pin, page.pin_hash) : false
+        if (!valid) {
+          return { content: [{ type: 'text' as const, text: 'PIN이 필요하거나 올바르지 않습니다.' }], isError: true }
+        }
       }
 
       const { error } = await supabase

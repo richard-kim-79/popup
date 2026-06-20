@@ -31,8 +31,19 @@ export default function EditPage() {
       setPageData({ blocks: data.blocks, htmlContent: data.htmlContent ?? null, locked: data.locked, daysLeft: data.daysLeft })
 
       const stored = localStorage.getItem(`popup_token_${slug}`)
-      if (stored) { setEditToken(stored) }
-      else { setShowPin(true) }
+      if (stored) {
+        setEditToken(stored)
+      } else {
+        // 로그인 소유자면 PIN 없이 토큰 발급 (소유 확인은 서버에서)
+        const ot = await fetch(`/api/pages/${slug}/owner-token`, { method: 'POST' })
+        if (ot.ok) {
+          const { editToken: t } = await ot.json() as { editToken: string }
+          localStorage.setItem(`popup_token_${slug}`, t)
+          setEditToken(t)
+        } else {
+          setShowPin(true)
+        }
+      }
       setLoading(false)
     }
     load()
