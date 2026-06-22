@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 
-type Action = 'delete' | 'restore' | 'unlock'
+type Action = 'delete' | 'restore' | 'unlock' | 'lock' | 'hide' | 'show'
 
 export async function PATCH(
   req: NextRequest,
@@ -19,6 +19,12 @@ export async function PATCH(
   } else if (action === 'unlock') {
     const extended = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     update = { locked: false, expires_at: extended }
+  } else if (action === 'lock') {
+    update = { locked: true }
+  } else if (action === 'hide') {
+    update = { listed: false, gallery_opt_out: true }
+  } else if (action === 'show') {
+    update = { listed: true, gallery_opt_out: false }
   } else {
     return NextResponse.json({ error: '잘못된 액션입니다.' }, { status: 400 })
   }

@@ -358,8 +358,8 @@ export type Database = {
           tier: string
           billing_cycle: string
           status: string
-          billing_key: string
-          customer_key: string
+          billing_key: string | null
+          customer_key: string | null
           card_company: string | null
           card_number_masked: string | null
           current_period_start: string
@@ -368,6 +368,7 @@ export type Database = {
           cancel_at_period_end: boolean
           canceled_at: string | null
           failed_charge_count: number
+          granted_by_admin: boolean
           created_at: string
           updated_at: string
         }
@@ -377,8 +378,8 @@ export type Database = {
           tier: string
           billing_cycle: string
           status: string
-          billing_key: string
-          customer_key: string
+          billing_key?: string | null
+          customer_key?: string | null
           card_company?: string | null
           card_number_masked?: string | null
           current_period_start: string
@@ -387,6 +388,7 @@ export type Database = {
           cancel_at_period_end?: boolean
           canceled_at?: string | null
           failed_charge_count?: number
+          granted_by_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -396,8 +398,8 @@ export type Database = {
           tier?: string
           billing_cycle?: string
           status?: string
-          billing_key?: string
-          customer_key?: string
+          billing_key?: string | null
+          customer_key?: string | null
           card_company?: string | null
           card_number_masked?: string | null
           current_period_start?: string
@@ -406,6 +408,7 @@ export type Database = {
           cancel_at_period_end?: boolean
           canceled_at?: string | null
           failed_charge_count?: number
+          granted_by_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -660,6 +663,33 @@ export type Database = {
           access_expires_at?: string | null
           refresh_expires_at?: string | null
           revoked_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      admin_actions: {
+        Row: {
+          id: number
+          action: string
+          target_type: string | null
+          target_id: string | null
+          meta: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          action: string
+          target_type?: string | null
+          target_id?: string | null
+          meta?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          action?: string
+          target_type?: string | null
+          target_id?: string | null
+          meta?: Json | null
           created_at?: string
         }
         Relationships: []
