@@ -44,12 +44,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const { data } = await supabase
     .from('pages')
-    .select('blocks, locked, expires_at, html_content')
+    .select('blocks, locked, expires_at, html_content, pdf_url, listing_title')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
 
   const isLocked = (data?.locked ?? false) || (data?.expires_at ? new Date(data.expires_at) < new Date() : false)
+
+  // PDF 페이지 — 파일명(listing_title) 기준 제목
+  if (data?.pdf_url) {
+    const title = data.listing_title?.trim() || 'PDF 문서'
+    const pageUrl = `${BASE}/${slug}`
+    return {
+      title,
+      robots: isLocked ? { index: false, follow: false } : { index: true, follow: true },
+      alternates: { canonical: pageUrl },
+      openGraph: { title, url: pageUrl, siteName: 'Popup', type: 'website' },
+      twitter: { card: 'summary', title },
+    }
+  }
 
   // HTML 페이지 — 업로드된 HTML 안의 <title>·og:* 메타 우선 사용
   if (data?.html_content) {
@@ -335,7 +348,7 @@ export default async function ViewerPage({ params }: Props) {
 
   const { data, error } = await supabase
     .from('pages')
-    .select('user_id, blocks, locked, expires_at, deleted_at, report_count, created_at, updated_at, html_content')
+    .select('user_id, blocks, locked, expires_at, deleted_at, report_count, created_at, updated_at, html_content, pdf_url')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
@@ -353,9 +366,10 @@ export default async function ViewerPage({ params }: Props) {
   }
   const isLocked = !exempt && (data.locked || new Date(data.expires_at) < new Date())
   const isHtmlPage = !!data.html_content
+  const isPdfPage = !!data.pdf_url
 
-  // ── HTML 페이지 — 풀스크린 iframe srcdoc 렌더링 ──────────────
-  if (isHtmlPage) {
+  // ── HTML / PDF 페이지 — 풀스크린 렌더링 ──────────────────────
+  if (isHtmlPage || isPdfPage) {
     if (isLocked) {
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-popup-bg text-center px-6">
@@ -380,14 +394,34 @@ export default async function ViewerPage({ params }: Props) {
         </div>
       )
     }
+    if (isHtmlPage) {
+      return (
+        <div style={{ height: '100vh', overflow: 'hidden', margin: 0, padding: 0 }}>
+          <iframe
+            srcDoc={data.html_content!}
+            sandbox="allow-scripts allow-forms allow-popups allow-modals"
+            style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+            title="HTML Page"
+          />
+        </div>
+      )
+    }
+    // PDF — 브라우저 내장 뷰어로 풀스크린. 모바일 인라인 실패 대비 폴백 링크.
     return (
-      <div style={{ height: '100vh', overflow: 'hidden', margin: 0, padding: 0 }}>
+      <div style={{ height: '100vh', overflow: 'hidden', margin: 0, padding: 0, position: 'relative' }}>
         <iframe
-          srcDoc={data.html_content!}
-          sandbox="allow-scripts allow-forms allow-popups allow-modals"
+          src={`${data.pdf_url!}#view=FitH`}
           style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-          title="HTML Page"
+          title="PDF"
         />
+        <a
+          href={data.pdf_url!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed right-3 top-3 z-10 rounded-lg bg-popup-text/85 px-3 py-1.5 text-xs font-medium text-white shadow hover:bg-popup-text"
+        >
+          열기 / 다운로드
+        </a>
       </div>
     )
   }

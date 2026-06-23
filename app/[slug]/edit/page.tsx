@@ -9,6 +9,7 @@ import type { Block } from '@/types'
 interface PageData {
   blocks: Block[]
   htmlContent?: string | null
+  pdfUrl?: string | null
   locked: boolean
   daysLeft: number
 }
@@ -26,7 +27,7 @@ export default function EditPage() {
       const res = await fetch(`/api/pages/${slug}`)
       if (!res.ok) { setError('페이지를 찾을 수 없습니다.'); setLoading(false); return }
       const data = await res.json()
-      setPageData({ blocks: data.blocks, htmlContent: data.htmlContent ?? null, locked: data.locked, daysLeft: data.daysLeft })
+      setPageData({ blocks: data.blocks, htmlContent: data.htmlContent ?? null, pdfUrl: data.pdfUrl ?? null, locked: data.locked, daysLeft: data.daysLeft })
 
       const stored = localStorage.getItem(`popup_token_${slug}`)
       if (stored) {
@@ -60,12 +61,12 @@ export default function EditPage() {
     </div>
   )
 
-  if (pageData?.htmlContent) return (
+  if (pageData?.htmlContent || pageData?.pdfUrl) return (
     <>
       {showShare && <ShareModal slug={slug} onClose={() => setShowShare(false)} />}
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-4 text-center">
         <div className="text-3xl">📄</div>
-        <p className="text-sm text-popup-muted">HTML 페이지는 블록 에디터로 편집할 수 없습니다.</p>
+        <p className="text-sm text-popup-muted">{pageData?.pdfUrl ? 'PDF' : 'HTML'} 페이지는 블록 에디터로 편집할 수 없습니다.</p>
         <div className="flex gap-3">
           <a
             href={`/${slug}`}

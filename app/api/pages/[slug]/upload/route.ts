@@ -2,54 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { verifyEditToken } from '@/lib/token'
 import { checkStorageQuota } from '@/lib/subscription'
+import {
+  ALLOWED_MIME, ALLOWED_VIDEO_MIME, MEDIA_MAX_SIZE, ensureBucket, createMediaUpload,
+} from '@/lib/media-bucket'
 import type { ApiError } from '@/types'
 
 type Params = { params: Promise<{ slug: string }> }
-
-/** 허용 MIME — 이미지 / PDF / 영상 */
-const ALLOWED_IMAGE_MIME = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'application/pdf',
-])
-
-const ALLOWED_VIDEO_MIME = new Set([
-  'video/mp4',
-  'video/quicktime',   // .mov — iPhone 기본 포맷
-  'video/webm',
-  'video/x-m4v',
-])
-
-const ALLOWED_MIME = new Set([...ALLOWED_IMAGE_MIME, ...ALLOWED_VIDEO_MIME])
-
-/** 이미지·PDF·영상 모두 50MB */
-const IMAGE_MAX_SIZE = parseInt(process.env.UPLOAD_MAX_SIZE ?? '') || 50 * 1024 * 1024
-const VIDEO_MAX_SIZE = IMAGE_MAX_SIZE
-
-const BUCKET = 'media'
-
-// 버킷 초기화 여부 (프로세스 수명 동안 1회만 실행)
-let bucketReady = false
-
-async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>) {
-  if (bucketReady) return
-
-  const { data: buckets } = await supabase.storage.listBuckets()
-  const exists = buckets?.some((b) => b.name === BUCKET)
-
-  const bucketOptions = {
-    public: true,
-    fileSizeLimit: IMAGE_MAX_SIZE,                      // 50MB
-    allowedMimeTypes: [...ALLOWED_MIME],                // 허용 MIME 명시
-  }
-
-  if (!exists) {
-    const { error } = await supabase.storage.createBucket(BUCKET, bucketOptions)
-    if (error) throw new Error(`버킷 생성 실패: ${error.message}`)
-  }
-  // 기존 버킷은 건드리지 않음 — 매 요청마다 updateBucket 호출하지 않는다
-
-  bucketReady = true
-}
 
 interface SignedUploadRequest {
   filename: string
@@ -95,7 +53,7 @@ export async function POST(
   }
 
   const isVideo  = ALLOWED_VIDEO_MIME.has(mimeType)
-  const maxSize  = isVideo ? VIDEO_MAX_SIZE : IMAGE_MAX_SIZE
+  const maxSize  = MEDIA_MAX_SIZE
   const limitMB  = `${Math.round(maxSize / 1024 / 1024)}MB`
 
   if (size > maxSize) {
@@ -127,32 +85,9 @@ export async function POST(
 
   try {
     await ensureBucket(supabase)
+    const up = await createMediaUpload(supabase, slug, filename)
+    return NextResponse.json({ ...up, filename, isVideo })
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
-
-  const ext  = filename.split('.').pop()?.toLowerCase() ?? 'bin'
-  const path = `${slug}/${Date.now()}.${ext}`
-
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUploadUrl(path)
-
-  if (error || !data) {
-    return NextResponse.json(
-      { error: `서명 URL 발급 실패: ${error?.message ?? '알 수 없는 오류'}` },
-      { status: 500 }
-    )
-  }
-
-  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
-
-  return NextResponse.json({
-    signedUrl: data.signedUrl,
-    token:     data.token,
-    path:      data.path,
-    publicUrl,
-    filename,
-    isVideo,
-  })
 }

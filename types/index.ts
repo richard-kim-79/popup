@@ -148,6 +148,7 @@ export interface CreatePageResponse {
 export interface PageResponse {
   blocks: Block[]
   htmlContent?: string | null  // raw HTML 페이지인 경우
+  pdfUrl?: string | null        // PDF 페이지인 경우
   locked: boolean
   expiresAt: string
   viewCount: number
@@ -220,6 +221,7 @@ export type Database = {
           listed_at: string | null
           search_vector: string | null
           html_content: string | null
+          pdf_url: string | null
           size_bytes: number
           source: string | null
           auto_listed: boolean
@@ -230,6 +232,7 @@ export type Database = {
           slug: string
           blocks?: Json
           html_content?: string | null
+          pdf_url?: string | null
           pin_hash: string
           expires_at: string
           delete_at: string
@@ -256,6 +259,7 @@ export type Database = {
           slug?: string
           blocks?: Json
           html_content?: string | null
+          pdf_url?: string | null
           pin_hash?: string
           expires_at?: string
           delete_at?: string

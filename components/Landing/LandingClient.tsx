@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { getSupabaseBrowser } from '@/lib/supabase'
 
 const REF_KEY = 'popup_ref'
 
@@ -48,7 +49,7 @@ export default function LandingClient() {
       e.preventDefault()
       setDragOver(false)
       const file = e.dataTransfer?.files?.[0]
-      if (file) void handleHtmlFile(file)
+      if (file) void handleFile(file)
     }
     document.addEventListener('dragover', onDragOver)
     document.addEventListener('dragleave', onDragLeave)
@@ -117,9 +118,55 @@ export default function LandingClient() {
     router.push(`/${data.slug}/edit`)
   }
 
+  // ── PDF 파일 처리 — Storage 업로드 후 풀스크린 PDF 페이지로 ──────
+  const handlePdfFile = async (file: File) => {
+    if (file.size > 50_000_000) {
+      alert('PDF 파일은 50MB 이하여야 합니다.')
+      return
+    }
+    setHtmlUploading(true)
+    const res = await fetch('/api/pages/pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        mimeType: file.type || 'application/pdf',
+        size: file.size,
+        source: getSource(),
+      }),
+    })
+    const data = await res.json() as {
+      slug?: string; editToken?: string; token?: string; path?: string; error?: string
+    }
+    if (!res.ok || !data.slug || !data.token || !data.path) {
+      alert(data.error ?? 'PDF 페이지 생성에 실패했습니다.')
+      setHtmlUploading(false)
+      return
+    }
+    // 서명 URL에 PDF 바이트 업로드 (헤더는 supabase-js가 처리)
+    const supabase = getSupabaseBrowser()
+    const { error: upErr } = await supabase.storage.from('media').uploadToSignedUrl(data.path, data.token, file, {
+      contentType: 'application/pdf',
+    })
+    if (upErr) {
+      alert(`PDF 업로드 실패: ${upErr.message}`)
+      setHtmlUploading(false)
+      return
+    }
+    localStorage.setItem(`popup_token_${data.slug}`, data.editToken ?? '')
+    router.push(`/${data.slug}`)
+  }
+
+  // 확장자로 HTML / PDF 분기
+  const handleFile = (file: File) => {
+    if (/\.pdf$/i.test(file.name)) return handlePdfFile(file)
+    if (/\.html?$/i.test(file.name)) return handleHtmlFile(file)
+    alert('.html · .pdf 파일만 올릴 수 있어요.')
+  }
+
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) void handleHtmlFile(file)
+    if (file) void handleFile(file)
     e.target.value = ''
   }
 
@@ -132,8 +179,8 @@ export default function LandingClient() {
         <div className="fixed inset-0 z-[500] flex flex-col items-center justify-center gap-3 bg-popup-accent/10 backdrop-blur-[2px] pointer-events-none">
           <div className="rounded-2xl border-2 border-dashed border-popup-accent bg-popup-white/90 px-12 py-8 text-center shadow-xl">
             <p className="text-4xl mb-3">📄</p>
-            <p className="text-base font-semibold text-popup-accent">HTML 파일을 놓으세요</p>
-            <p className="mt-1 text-xs text-popup-muted">.html</p>
+            <p className="text-base font-semibold text-popup-accent">HTML · PDF 파일을 놓으세요</p>
+            <p className="mt-1 text-xs text-popup-muted">.html · .pdf</p>
           </div>
         </div>
       )}
@@ -154,11 +201,11 @@ export default function LandingClient() {
         className="group mt-5 w-full max-w-xs rounded-xl border-2 border-dashed border-popup-border bg-popup-surface/40 px-5 py-4 text-center transition-colors hover:border-popup-accent hover:bg-popup-accent-bg disabled:opacity-50"
       >
         <span className="block text-sm font-medium text-popup-text">
-          📄 HTML 올려서 바로 공유
+          📄 HTML · PDF 올려서 바로 공유
         </span>
         <span className="mt-0.5 block text-xs text-popup-muted">
           {htmlUploading
-            ? 'HTML 업로드 중…'
+            ? '업로드 중…'
             : '끌어다 놓거나 클릭'}
         </span>
       </button>
@@ -166,7 +213,7 @@ export default function LandingClient() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".html,.htm"
+        accept=".html,.htm,.pdf"
         onChange={handleFileInput}
         className="hidden"
       />

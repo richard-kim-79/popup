@@ -26,12 +26,16 @@ export async function PUT(
   // 잠긴 페이지는 편집 불가
   const { data: page } = await supabase
     .from('pages')
-    .select('locked, deleted_at, listed, auto_listed, gallery_opt_out')
+    .select('locked, deleted_at, listed, auto_listed, gallery_opt_out, pdf_url')
     .eq('slug', slug)
     .single()
 
   if (!page || page.deleted_at) {
     return NextResponse.json({ error: '페이지를 찾을 수 없습니다.' }, { status: 404 })
+  }
+
+  if (page.pdf_url) {
+    return NextResponse.json({ error: 'PDF 페이지는 블록 편집할 수 없습니다.' }, { status: 400 })
   }
 
   if (page.locked) {

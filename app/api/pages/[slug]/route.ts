@@ -14,7 +14,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from('pages')
-    .select('blocks, locked, expires_at, view_count, deleted_at, html_content')
+    .select('blocks, locked, expires_at, view_count, deleted_at, html_content, pdf_url')
     .eq('slug', slug)
     .is('deleted_at', null)
     .single()
@@ -33,6 +33,7 @@ export async function GET(
   return NextResponse.json({
     blocks: (data.blocks as unknown) as Block[],
     htmlContent: data.html_content ?? null,
+    pdfUrl: data.pdf_url ?? null,
     locked: data.locked,
     expiresAt: data.expires_at,
     viewCount: data.view_count,
