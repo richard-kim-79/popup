@@ -400,7 +400,8 @@ export default async function ViewerPage({ params }: Props) {
         <div style={{ height: '100vh', overflow: 'hidden', margin: 0, padding: 0 }}>
           <iframe
             srcDoc={injectHtmlShim(data.html_content!)}
-            sandbox="allow-scripts allow-forms allow-popups allow-modals"
+            sandbox="allow-scripts allow-forms allow-popups allow-modals allow-pointer-lock allow-orientation-lock"
+            allow="fullscreen; pointer-lock; gamepad; accelerometer; gyroscope"
             style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
             title="HTML Page"
           />
