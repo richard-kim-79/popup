@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import ReportButton from '@/components/ReportButton'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { extractHtmlMeta } from '@/lib/html-meta'
+import { injectHtmlShim } from '@/lib/html-shim'
 import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
 import SocialEmbed from '@/components/Blocks/SocialEmbed'
 import LockedBanner from '@/components/Viewer/LockedBanner'
@@ -398,7 +399,7 @@ export default async function ViewerPage({ params }: Props) {
       return (
         <div style={{ height: '100vh', overflow: 'hidden', margin: 0, padding: 0 }}>
           <iframe
-            srcDoc={data.html_content!}
+            srcDoc={injectHtmlShim(data.html_content!)}
             sandbox="allow-scripts allow-forms allow-popups allow-modals"
             style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
             title="HTML Page"
