@@ -226,6 +226,7 @@ export type Database = {
           source: string | null
           auto_listed: boolean
           gallery_opt_out: boolean
+          attachment_text: string | null
         }
         Insert: {
           id?: string
@@ -253,6 +254,7 @@ export type Database = {
           source?: string | null
           auto_listed?: boolean
           gallery_opt_out?: boolean
+          attachment_text?: string | null
         }
         Update: {
           id?: string
@@ -280,6 +282,7 @@ export type Database = {
           source?: string | null
           auto_listed?: boolean
           gallery_opt_out?: boolean
+          attachment_text?: string | null
         }
         Relationships: []
       }

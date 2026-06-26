@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { verifyEditToken } from '@/lib/token'
 import { deriveListing } from '@/lib/listing'
+import { extractPdfText } from '@/lib/pdf-text'
 import type { ApiError } from '@/types'
 
 type Params = { params: Promise<{ slug: string }> }
@@ -70,7 +71,62 @@ export async function PUT(
   // 저장된 blocks에서 더 이상 참조되지 않는 media 파일 제거
   void cleanupOrphans(supabase, slug, body.blocks as unknown[]).catch(() => {})
 
+  // ── PDF 첨부 내부 텍스트 색인 (응답 후 백그라운드) ─────────────
+  // 응답을 막지 않도록 after()로 처리. attachment_text 갱신 → 트리거가 search_text 재계산.
+  after(async () => {
+    try { await indexPdfText(supabase, slug, body.blocks as unknown[]) } catch { /* 무시 */ }
+  })
+
   return NextResponse.json({ ok: true })
+}
+
+/** PDF 최대 처리 크기 — 너무 큰 파일은 색인 생략(서버리스 메모리 보호) */
+const MAX_PDF_BYTES = 15 * 1024 * 1024
+const MAX_ATTACHMENT_CHARS = 30000
+
+/**
+ * blocks의 PDF 첨부에서 텍스트를 추출해 pages.attachment_text 갱신(검색 색인용).
+ * - PDF 없음 → attachment_text=null로 정리
+ * - 추출 실패만 발생 → 기존 값 보존(덮어쓰지 않음)
+ */
+async function indexPdfText(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  slug: string,
+  blocks: unknown[],
+): Promise<void> {
+  const urls = [...new Set(
+    blocks
+      .map((b) => b as { url?: unknown; mediaType?: unknown })
+      .filter((b) => typeof b.url === 'string'
+        && (b.mediaType === 'pdf' || /\.pdf($|\?)/i.test(b.url as string)))
+      .map((b) => b.url as string),
+  )]
+
+  if (urls.length === 0) {
+    // 첨부 PDF가 없으면 색인 텍스트 제거
+    await supabase.from('pages').update({ attachment_text: null }).eq('slug', slug)
+    return
+  }
+
+  let text = ''
+  for (const url of urls) {
+    if (text.length >= MAX_ATTACHMENT_CHARS) break
+    try {
+      const res = await fetch(url)
+      if (!res.ok) continue
+      const len = Number(res.headers.get('content-length') ?? 0)
+      if (len && len > MAX_PDF_BYTES) continue
+      const buf = new Uint8Array(await res.arrayBuffer())
+      if (buf.byteLength > MAX_PDF_BYTES) continue
+      const t = await extractPdfText(buf, MAX_ATTACHMENT_CHARS - text.length)
+      if (t) text += (text ? ' ' : '') + t
+    } catch { /* 개별 PDF 실패는 건너뜀 */ }
+  }
+
+  // 추출이 모두 실패하면 기존 값 보존(덮어쓰지 않음)
+  if (text) {
+    await supabase.from('pages').update({ attachment_text: text.slice(0, MAX_ATTACHMENT_CHARS) }).eq('slug', slug)
+  }
 }
 
 /**

@@ -28,6 +28,7 @@
     "react-dom": "19.2.4",
     "react-qr-code": "^2.0.18",
     "react-tweet": "^3.3.0",
+    "unpdf": "^1.6.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
