@@ -68,6 +68,9 @@ export default function MyPagesPage() {
 
   // 문서 검색어 (제목 + 본문)
   const [query, setQuery] = useState('')
+  // 서버 검색(내 페이지 PGroonga, 비공개 포함) 결과 — 검색어 있을 때 사용
+  const [searchHits, setSearchHits] = useState<Array<{ slug: string; snippet: string | null; score: number }> | null>(null)
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 탭
   const [tab, setTab] = useState<TabKey>('active')
@@ -235,12 +238,7 @@ export default function MyPagesPage() {
   const sortedPages = useMemo(() => {
     if (!pages) return null
     // 탭 필터: 활성/만료
-    let filtered = pages.filter((p) => (tab === 'active' ? isPageActive(p) : !isPageActive(p)))
-    // 문서 검색: 제목 + 본문(searchText) 부분 일치
-    const q = query.trim().toLowerCase()
-    if (q) {
-      filtered = filtered.filter((p) => (p.searchText ?? p.title).toLowerCase().includes(q))
-    }
+    const filtered = pages.filter((p) => (tab === 'active' ? isPageActive(p) : !isPageActive(p)))
     const arr = [...filtered]
     switch (sortKey) {
       case 'recent':
@@ -257,7 +255,41 @@ export default function MyPagesPage() {
           return new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime()
         })
     }
-  }, [pages, sortKey, tab, query])
+  }, [pages, sortKey, tab])
+
+  const searchActive = query.trim().length > 0
+
+  // ── 검색어 입력 시 서버 검색(디바운스) — 내 모든 페이지(비공개 포함) ──
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) { setSearchHits(null); return }
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/my-pages/search?q=${encodeURIComponent(q)}`)
+        if (res.ok) {
+          const j = await res.json() as { results: Array<{ slug: string; snippet: string | null; score: number }> }
+          setSearchHits(j.results ?? [])
+        }
+      } catch { setSearchHits([]) }
+    }, 250)
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current) }
+  }, [query])
+
+  // 표시 목록: 검색 중이면 서버 결과(관련도순·스니펫), 아니면 탭/정렬 목록
+  type DisplayPage = Page & { snippet?: string | null }
+  const displayList = useMemo<DisplayPage[] | null>(() => {
+    if (!pages) return null
+    if (searchActive) {
+      if (!searchHits) return null
+      const bySlug = new Map(pages.map((p) => [p.slug, p]))
+      return searchHits.flatMap((h) => {
+        const p = bySlug.get(h.slug)
+        return p ? [{ ...p, snippet: h.snippet }] : []
+      })
+    }
+    return sortedPages ?? null
+  }, [pages, searchActive, searchHits, sortedPages])
 
   // ── 호버 미리보기 핸들러 ─────────────────────────────────────
   const handleHoverEnter = (e: React.MouseEvent<HTMLElement>, p: Page) => {
@@ -395,8 +427,18 @@ export default function MyPagesPage() {
               </div>
             )}
 
+            {/* ── 검색 결과 헤더 ─────────────────────────────────── */}
+            {searchActive && (
+              <>
+                <style>{`.keyword{color:#2A6049;font-weight:600;background:#EDF5F1;border-radius:2px;padding:0 1px}`}</style>
+                <p className="mb-3 text-xs text-popup-muted">
+                  {displayList ? `검색 결과 ${displayList.length}건 · 내 모든 페이지` : '검색 중…'}
+                </p>
+              </>
+            )}
+
             {/* ── 탭 ───────────────────────────────────────────── */}
-            {pages && pages.length > 0 && (
+            {pages && pages.length > 0 && !searchActive && (
               <div role="tablist" aria-label="페이지 상태" className="mb-4 flex items-center gap-1 border-b border-popup-border">
                 {(Object.keys(TAB_LABELS) as TabKey[]).map((k) => {
                   const active = tab === k
@@ -439,7 +481,7 @@ export default function MyPagesPage() {
             )}
 
             {/* ── 탭은 있는데 해당 탭만 비어있음 ─────────────── */}
-            {pages && pages.length > 0 && sortedPages && sortedPages.length === 0 && (
+            {pages && pages.length > 0 && displayList && displayList.length === 0 && (
               <div className="rounded-xl border border-popup-border bg-popup-white py-12 text-center">
                 <p className="text-sm text-popup-muted">
                   {query.trim()
@@ -449,9 +491,9 @@ export default function MyPagesPage() {
               </div>
             )}
 
-            {sortedPages && sortedPages.length > 0 && (
+            {displayList && displayList.length > 0 && (
               <div className="flex flex-col gap-3">
-                {sortedPages.map((p) => {
+                {displayList.map((p) => {
                   const left = daysLeft(p.expires_at)
                   const isLocked = !!p.locked || left <= 0
                   return (
@@ -477,6 +519,12 @@ export default function MyPagesPage() {
                             </span>
                           )}
                         </div>
+                        {p.snippet && (
+                          <p
+                            className="mt-1 line-clamp-2 text-xs leading-relaxed text-popup-muted"
+                            dangerouslySetInnerHTML={{ __html: p.snippet }}
+                          />
+                        )}
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-popup-faint">
                           <span>{left > 0 ? `${left}일 남음` : '만료됨'}</span>
                           {!isLocked && (
