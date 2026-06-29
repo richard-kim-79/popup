@@ -5,6 +5,7 @@ export interface SearchResult {
   slug: string
   listing_title: string
   listing_description: string | null
+  listing_image: string | null
   listed_at: string
   view_count: number
   score: number
@@ -14,37 +15,44 @@ export interface SearchResult {
 interface SearchResponse {
   pages: SearchResult[]
   total: number
+  page: number
+  hasMore: boolean
   trending?: boolean
 }
 
 type SearchRow = SearchResult & { total_count: number }
 
 const PAGE_SIZE = 24
+const SORTS = new Set(['relevance', 'recent', 'popular'])
 
 /**
- * GET /api/search?q=키워드
+ * GET /api/search?q=키워드&page=1&sort=relevance|recent|popular
  *
- * PGroonga 전문검색(한국어 형태소·부분일치) + 관련도·인기·최신 랭킹 + 스니펫 하이라이트.
- * q 없으면 인기(view_count)·최신 순 "트렌딩" 반환.
+ * PGroonga 전문검색 + 정렬(관련도/최신/인기) + 페이지네이션 + 썸네일.
+ * q 없으면 인기·최신 "트렌딩".
  */
 export async function GET(
   req: NextRequest,
 ): Promise<NextResponse<SearchResponse | { error: string }>> {
-  const raw = req.nextUrl.searchParams.get('q')?.trim() ?? ''
-  // PGroonga 쿼리 구문 충돌 문자 제거(오류 방지)
+  const sp = req.nextUrl.searchParams
+  const raw = sp.get('q')?.trim() ?? ''
   const q = raw.replace(/["'()\\]/g, ' ').replace(/\s+/g, ' ').trim()
+  const page = Math.max(1, parseInt(sp.get('page') ?? '1') || 1)
+  const sort = SORTS.has(sp.get('sort') ?? '') ? sp.get('sort')! : 'relevance'
+  const offset = (page - 1) * PAGE_SIZE
   const supabase = getSupabaseAdmin()
 
   // ── 빈 쿼리: 트렌딩(인기·최신) ──────────────────────────────
   if (!q) {
-    const { data, error } = await supabase
+    const { data, count, error } = await supabase
       .from('pages')
-      .select('slug, listing_title, listing_description, listed_at, view_count')
+      .select('slug, listing_title, listing_description, listing_image, listed_at, view_count', { count: 'exact' })
       .eq('listed', true)
       .is('deleted_at', null)
+      .lt('report_count', 3)
       .order('view_count', { ascending: false })
       .order('listed_at', { ascending: false })
-      .limit(PAGE_SIZE)
+      .range(offset, offset + PAGE_SIZE - 1)
     if (error) return NextResponse.json({ error: '검색 중 오류가 발생했습니다.' }, { status: 500 })
     const pages: SearchResult[] = (data ?? []).flatMap((p) =>
       p.listing_title && p.listed_at
@@ -52,6 +60,7 @@ export async function GET(
             slug: p.slug,
             listing_title: p.listing_title,
             listing_description: p.listing_description,
+            listing_image: p.listing_image,
             listed_at: p.listed_at,
             view_count: p.view_count ?? 0,
             score: 0,
@@ -59,7 +68,8 @@ export async function GET(
           }]
         : [],
     )
-    return NextResponse.json({ pages, total: pages.length, trending: true })
+    const total = count ?? pages.length
+    return NextResponse.json({ pages, total, page, hasMore: offset + pages.length < total, trending: true })
   }
 
   // ── 검색: PGroonga RPC ──────────────────────────────────────
@@ -68,7 +78,9 @@ export async function GET(
     args: Record<string, unknown>,
   ) => Promise<{ data: SearchRow[] | null; error: { message: string } | null }>
 
-  const { data, error } = await callRpc('search_pages', { p_q: q, p_limit: PAGE_SIZE, p_offset: 0 })
+  const { data, error } = await callRpc('search_pages', {
+    p_q: q, p_limit: PAGE_SIZE, p_offset: offset, p_sort: sort,
+  })
   if (error) return NextResponse.json({ error: '검색 중 오류가 발생했습니다.' }, { status: 500 })
 
   const rows = data ?? []
@@ -77,10 +89,11 @@ export async function GET(
     slug: r.slug,
     listing_title: r.listing_title,
     listing_description: r.listing_description,
+    listing_image: r.listing_image,
     listed_at: r.listed_at,
     view_count: Number(r.view_count ?? 0),
     score: Number(r.score ?? 0),
     snippet: r.snippet,
   }))
-  return NextResponse.json({ pages, total })
+  return NextResponse.json({ pages, total, page, hasMore: offset + pages.length < total })
 }

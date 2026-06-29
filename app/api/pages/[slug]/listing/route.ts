@@ -46,7 +46,7 @@ export async function PATCH(
   }
 
   if (body.listed) {
-    const { title, description } = deriveListing(page.blocks, page.html_content)
+    const { title, description, image } = deriveListing(page.blocks, page.html_content)
     const { error } = await admin
       .from('pages')
       .update({
@@ -55,6 +55,7 @@ export async function PATCH(
         gallery_opt_out: false,
         listing_title: title,
         listing_description: description,
+        listing_image: image,
         listed_at: new Date().toISOString(),
       })
       .eq('slug', slug)

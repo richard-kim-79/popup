@@ -48,12 +48,13 @@ export async function PUT(
   // 수동 등록(listed && !auto_listed)은 사용자 큐레이션이므로 건드리지 않는다.
   const update: Record<string, unknown> = { blocks: body.blocks }
   if (!page.gallery_opt_out && (page.auto_listed || !page.listed)) {
-    const { title, description } = deriveListing(body.blocks)
+    const { title, description, image } = deriveListing(body.blocks)
     if (title) {
       update.listed = true
       update.auto_listed = true
       update.listing_title = title
       update.listing_description = description
+      update.listing_image = image
       update.listed_at = new Date().toISOString()
     }
   }

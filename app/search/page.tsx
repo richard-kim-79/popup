@@ -6,6 +6,13 @@ import type { SearchResult } from '@/app/api/search/route'
 
 const BASE = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com'
 
+type Sort = 'relevance' | 'recent' | 'popular'
+const SORT_TABS: { v: Sort; l: string }[] = [
+  { v: 'relevance', l: '관련도' },
+  { v: 'recent', l: '최신' },
+  { v: 'popular', l: '인기' },
+]
+
 interface Suggestion { slug: string; title: string }
 
 function formatDate(iso: string): string {
@@ -14,10 +21,14 @@ function formatDate(iso: string): string {
 
 export default function SearchPage() {
   const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<Sort>('relevance')
   const [results, setResults] = useState<SearchResult[]>([])
   const [total, setTotal] = useState(0)
   const [trending, setTrending] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [initialLoaded, setInitialLoaded] = useState(false)
 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
@@ -25,36 +36,54 @@ export default function SearchPage() {
 
   const resultsDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const suggestDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-  const fetchResults = useCallback(async (q: string) => {
-    setLoading(true)
+  const runSearch = useCallback(async (q: string, s: Sort, pageNum: number, append: boolean) => {
+    if (append) setLoadingMore(true); else setLoading(true)
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&page=${pageNum}&sort=${s}`)
       if (res.ok) {
-        const json = await res.json() as { pages: SearchResult[]; total: number; trending?: boolean }
-        setResults(json.pages)
+        const json = await res.json() as {
+          pages: SearchResult[]; total: number; page: number; hasMore: boolean; trending?: boolean
+        }
+        setResults((prev) => (append ? [...prev, ...json.pages] : json.pages))
         setTotal(json.total)
         setTrending(!!json.trending)
+        setHasMore(json.hasMore)
+        setPage(json.page)
       }
     } finally {
-      setLoading(false)
+      if (append) setLoadingMore(false); else setLoading(false)
     }
   }, [])
 
   // 초기: 트렌딩 로드
   useEffect(() => {
-    fetchResults('').then(() => setInitialLoaded(true))
-  }, [fetchResults])
+    runSearch('', 'relevance', 1, false).then(() => setInitialLoaded(true))
+  }, [runSearch])
 
-  // 결과 디바운스
+  // 결과: 검색어/정렬 변경 시 1페이지부터 재검색 (디바운스)
   useEffect(() => {
     if (!initialLoaded) return
     if (resultsDebounce.current) clearTimeout(resultsDebounce.current)
-    resultsDebounce.current = setTimeout(() => fetchResults(query), 320)
+    resultsDebounce.current = setTimeout(() => runSearch(query.trim(), sort, 1, false), 300)
     return () => { if (resultsDebounce.current) clearTimeout(resultsDebounce.current) }
-  }, [query, fetchResults, initialLoaded])
+  }, [query, sort, runSearch, initialLoaded])
 
-  // 자동완성 디바운스 (빠르게)
+  // 무한 스크롤: sentinel이 보이면 다음 페이지 append
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+        runSearch(query.trim(), sort, page + 1, true)
+      }
+    }, { rootMargin: '400px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, loading, loadingMore, page, query, sort, runSearch])
+
+  // 자동완성 디바운스
   useEffect(() => {
     const q = query.trim()
     if (!q) { setSuggestions([]); return }
@@ -71,6 +100,8 @@ export default function SearchPage() {
     return () => { if (suggestDebounce.current) clearTimeout(suggestDebounce.current) }
   }, [query])
 
+  const isSearch = query.trim().length > 0
+
   return (
     <div className="min-h-screen bg-popup-bg">
       {/* PGroonga 스니펫 하이라이트 */}
@@ -84,7 +115,7 @@ export default function SearchPage() {
         <h1 className="mb-6 text-center text-2xl font-extrabold tracking-tight text-popup-text">Popup 검색</h1>
 
         {/* 검색창 + 자동완성 */}
-        <div className="relative mb-8">
+        <div className="relative mb-5">
           <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-popup-muted">
               <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
@@ -125,12 +156,29 @@ export default function SearchPage() {
           )}
         </div>
 
+        {/* 정렬 탭 (검색 시) */}
+        {isSearch && (
+          <div className="mb-3 flex gap-1">
+            {SORT_TABS.map((t) => (
+              <button
+                key={t.v}
+                onClick={() => setSort(t.v)}
+                className={`rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                  sort === t.v
+                    ? 'bg-popup-accent text-popup-accent-fg'
+                    : 'text-popup-muted hover:bg-popup-white'
+                }`}
+              >
+                {t.l}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* 결과 헤더 */}
         {!loading && (
           <p className="mb-3 text-xs text-popup-muted">
-            {trending
-              ? '🔥 인기 페이지'
-              : `"${query.trim()}" 검색 결과 ${total}건`}
+            {trending ? '🔥 인기 페이지' : `"${query.trim()}" 검색 결과 약 ${total.toLocaleString()}건`}
           </p>
         )}
 
@@ -139,7 +187,7 @@ export default function SearchPage() {
         {!loading && results.length === 0 && (
           <div className="py-12 text-center">
             <p className="text-sm text-popup-muted">
-              {query.trim() ? '검색 결과가 없어요.' : '아직 등록된 페이지가 없어요.'}
+              {isSearch ? '검색 결과가 없어요.' : '아직 등록된 페이지가 없어요.'}
             </p>
           </div>
         )}
@@ -152,25 +200,49 @@ export default function SearchPage() {
                   href={`${BASE}/${p.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block rounded-xl border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-accent/50 hover:bg-popup-bg"
+                  className="flex gap-3 rounded-xl border border-popup-border bg-popup-white p-4 transition-colors hover:border-popup-accent/50 hover:bg-popup-bg"
                 >
-                  <p className="truncate text-sm font-semibold text-popup-text">{p.listing_title}</p>
-                  {p.snippet ? (
-                    <p
-                      className="mt-1 line-clamp-2 text-xs leading-relaxed text-popup-muted"
-                      dangerouslySetInnerHTML={{ __html: p.snippet }}
+                  {p.listing_image && (
+                    <img
+                      src={p.listing_image}
+                      alt=""
+                      loading="lazy"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                      className="h-16 w-16 shrink-0 rounded-lg border border-popup-border object-cover"
                     />
-                  ) : p.listing_description ? (
-                    <p className="mt-1 line-clamp-2 text-xs text-popup-muted">{p.listing_description}</p>
-                  ) : null}
-                  <p className="mt-1.5 text-[11px] text-popup-faint">
-                    popup2026.com/{p.slug} · {formatDate(p.listed_at)}
-                    {p.view_count > 0 && <> · 조회 {p.view_count.toLocaleString()}</>}
-                  </p>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-popup-text">{p.listing_title}</p>
+                    {p.snippet ? (
+                      <p
+                        className="mt-1 line-clamp-2 text-xs leading-relaxed text-popup-muted"
+                        dangerouslySetInnerHTML={{ __html: p.snippet }}
+                      />
+                    ) : p.listing_description ? (
+                      <p className="mt-1 line-clamp-2 text-xs text-popup-muted">{p.listing_description}</p>
+                    ) : null}
+                    <p className="mt-1.5 text-[11px] text-popup-faint">
+                      popup2026.com/{p.slug} · {formatDate(p.listed_at)}
+                      {p.view_count > 0 && <> · 조회 {p.view_count.toLocaleString()}</>}
+                    </p>
+                  </div>
                 </a>
               </li>
             ))}
           </ul>
+        )}
+
+        {/* 무한 스크롤 sentinel + 폴백 */}
+        {!loading && hasMore && (
+          <div ref={sentinelRef} className="py-6 text-center">
+            <button
+              onClick={() => runSearch(query.trim(), sort, page + 1, true)}
+              disabled={loadingMore}
+              className="rounded-lg border border-popup-border bg-popup-white px-4 py-2 text-xs text-popup-muted hover:border-popup-text disabled:opacity-50"
+            >
+              {loadingMore ? '불러오는 중…' : '더 보기'}
+            </button>
+          </div>
         )}
       </div>
     </div>
