@@ -207,8 +207,10 @@ export default function SearchPage() {
                       src={p.listing_image}
                       alt=""
                       loading="lazy"
+                      style={{ opacity: 0 }}
+                      onLoad={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '1' }}
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                      className="h-16 w-16 shrink-0 rounded-lg border border-popup-border object-cover"
+                      className="h-16 w-16 shrink-0 rounded-lg object-cover transition-opacity"
                     />
                   )}
                   <div className="min-w-0 flex-1">
