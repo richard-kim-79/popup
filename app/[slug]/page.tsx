@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
@@ -9,6 +10,21 @@ import type { Block, YoutubeBlock, LinkBlock, ImageWidth } from '@/types'
 import SocialEmbed from '@/components/Blocks/SocialEmbed'
 import LockedBanner from '@/components/Viewer/LockedBanner'
 import MadeWithPopup from '@/components/Viewer/MadeWithPopup'
+
+// ISR: 공개 뷰어를 60초 캐시 — 콜드스타트·DB부하 완화. 수명/잠금은 분 단위 재검증으로 충분.
+export const revalidate = 60
+
+// 한 요청 내 generateMetadata + 렌더가 같은 DB 조회를 공유(중복 fetch 제거).
+const getPageData = cache(async (slug: string) => {
+  const supabase = getSupabaseAdmin()
+  const { data } = await supabase
+    .from('pages')
+    .select('user_id, blocks, locked, expires_at, deleted_at, report_count, created_at, updated_at, html_content, pdf_url, listing_title')
+    .eq('slug', slug)
+    .is('deleted_at', null)
+    .single()
+  return data
+})
 
 /** URL에서 hostname 안전하게 추출 */
 function safeHostname(url: string): string {
@@ -40,15 +56,9 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const supabase = getSupabaseAdmin()
   const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com').trim()
 
-  const { data } = await supabase
-    .from('pages')
-    .select('blocks, locked, expires_at, html_content, pdf_url, listing_title')
-    .eq('slug', slug)
-    .is('deleted_at', null)
-    .single()
+  const data = await getPageData(slug)
 
   const isLocked = (data?.locked ?? false) || (data?.expires_at ? new Date(data.expires_at) < new Date() : false)
 
@@ -347,14 +357,8 @@ export default async function ViewerPage({ params }: Props) {
   const supabase = getSupabaseAdmin()
   const BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? 'https://popup2026.com').trim()
 
-  const { data, error } = await supabase
-    .from('pages')
-    .select('user_id, blocks, locked, expires_at, deleted_at, report_count, created_at, updated_at, html_content, pdf_url')
-    .eq('slug', slug)
-    .is('deleted_at', null)
-    .single()
-
-  if (error || !data) notFound()
+  const data = await getPageData(slug)
+  if (!data) notFound()
 
   const isHidden = (data.report_count ?? 0) >= REPORT_HIDE_THRESHOLD
   const blocks = (data.blocks as unknown) as Block[]

@@ -24,6 +24,8 @@ type SearchRow = SearchResult & { total_count: number }
 
 const PAGE_SIZE = 24
 const SORTS = new Set(['relevance', 'recent', 'popular'])
+// CDN 엣지 캐시 — 동일 쿼리 30초 캐시 + SWR(콜드/DB부하 완화)
+const CACHE = { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' }
 
 /**
  * GET /api/search?q=키워드&page=1&sort=relevance|recent|popular
@@ -69,7 +71,10 @@ export async function GET(
         : [],
     )
     const total = count ?? pages.length
-    return NextResponse.json({ pages, total, page, hasMore: offset + pages.length < total, trending: true })
+    return NextResponse.json(
+      { pages, total, page, hasMore: offset + pages.length < total, trending: true },
+      { headers: CACHE },
+    )
   }
 
   // ── 검색: PGroonga RPC ──────────────────────────────────────
@@ -95,5 +100,8 @@ export async function GET(
     score: Number(r.score ?? 0),
     snippet: r.snippet,
   }))
-  return NextResponse.json({ pages, total, page, hasMore: offset + pages.length < total })
+  return NextResponse.json(
+    { pages, total, page, hasMore: offset + pages.length < total },
+    { headers: CACHE },
+  )
 }
