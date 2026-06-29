@@ -12,7 +12,9 @@ import LockedBanner from '@/components/Viewer/LockedBanner'
 import MadeWithPopup from '@/components/Viewer/MadeWithPopup'
 
 // ISR: 공개 뷰어를 60초 캐시 — 콜드스타트·DB부하 완화. 수명/잠금은 분 단위 재검증으로 충분.
+// 빈 generateStaticParams가 있어야 동적 슬러그가 "주문형 생성 + 캐시(ISR)"로 처리됨(없으면 매 요청 동적).
 export const revalidate = 60
+export function generateStaticParams(): { slug: string }[] { return [] }
 
 // 한 요청 내 generateMetadata + 렌더가 같은 DB 조회를 공유(중복 fetch 제거).
 const getPageData = cache(async (slug: string) => {
