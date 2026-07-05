@@ -14,7 +14,7 @@ export default function Hero({ onStart }: HeroProps) {
 
       {/* 서브: 세 단어로 끝 */}
       <p className="mb-10 text-base text-popup-muted">
-        로그인 없이 &nbsp;·&nbsp; 30일 무료 &nbsp;·&nbsp; PIN 보호
+        로그인 없이 &nbsp;·&nbsp; 30일 무료 &nbsp;·&nbsp; 링크로 공유
       </p>
 
       {/* 단 하나의 CTA */}

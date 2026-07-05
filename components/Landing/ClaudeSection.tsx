@@ -5,7 +5,7 @@ const MCP_URL = 'https://popup2026.com/api/mcp'
 
 const STEPS = [
   { label: 'Claude.ai 접속', desc: '설정 → 통합(Integrations) 메뉴를 엽니다' },
-  { label: 'URL 붙여넣기', desc: `${MCP_URL} 를 추가합니다` },
+  { label: 'URL 추가 · 연결', desc: `${MCP_URL} 추가 → 구글 로그인 한 번` },
   { label: '대화로 페이지 제작', desc: '"카페 소개 페이지 만들어줘"처럼 말하면 즉시 완성' },
 ]
 
@@ -27,7 +27,8 @@ export default function ClaudeSection() {
           Claude에서 바로 만드세요
         </h2>
         <p className="mb-10 text-base text-popup-muted">
-          Claude.ai에 URL 하나만 추가하면 대화만으로 Popup 페이지를 만들고 공유할 수 있습니다.
+          Claude.ai에 URL 하나 추가하고 구글 로그인하면, 대화만으로 Popup 페이지를 만들어 공유하고
+          내 계정에 자동 저장돼요. 별도 PIN 없이 <span className="whitespace-nowrap">/my-pages</span>에서 관리·수정합니다.
         </p>
 
         {/* URL 복사 박스 */}
@@ -68,7 +69,7 @@ export default function ClaudeSection() {
           <div className="space-y-2">
             {[
               { who: '나', text: '우리 카페 오픈 소식 페이지 만들어줘. 위치는 강남역 3번 출구' },
-              { who: 'Claude', text: '✅ 페이지가 생성됐습니다! 🔗 popup2026.com/abc123 · 🔑 PIN: 4827' },
+              { who: 'Claude', text: '✅ 페이지가 생성됐습니다! 🔗 popup2026.com/abc123 · 내 페이지에 자동 저장돼요' },
               { who: '나', text: '사진이랑 예약 버튼도 추가해줘' },
               { who: 'Claude', text: '✅ 업데이트 완료! 이미지와 네이버 예약 버튼을 추가했습니다.' },
             ].map((msg, i) => (

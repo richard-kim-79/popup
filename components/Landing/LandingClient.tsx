@@ -100,7 +100,6 @@ export default function LandingClient() {
       reader.readAsText(file, 'utf-8')
     })
 
-    // 임시 PIN — 공유 버튼 클릭 시 진짜 PIN으로 교체
     const res = await fetch('/api/pages/html', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
