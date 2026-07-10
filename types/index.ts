@@ -219,6 +219,7 @@ export type Database = {
           listing_title: string | null
           listing_description: string | null
           listing_image: string | null
+          storage_purged_at: string | null
           listed_at: string | null
           search_vector: string | null
           html_content: string | null
@@ -250,6 +251,7 @@ export type Database = {
           listing_title?: string | null
           listing_description?: string | null
           listing_image?: string | null
+          storage_purged_at?: string | null
           listed_at?: string | null
           search_vector?: string | null
           size_bytes?: number
@@ -279,6 +281,7 @@ export type Database = {
           listing_title?: string | null
           listing_description?: string | null
           listing_image?: string | null
+          storage_purged_at?: string | null
           listed_at?: string | null
           search_vector?: string | null
           size_bytes?: number
