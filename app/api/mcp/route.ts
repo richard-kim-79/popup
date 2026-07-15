@@ -17,8 +17,13 @@ import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { generateUniqueSlug } from '@/lib/slug'
 import { resolveApiKeyUserId } from '@/lib/api-key-middleware'
 import { sha256, MCP_RESOURCE, wwwAuthenticate } from '@/lib/oauth'
+import { ensureBucket, BUCKET } from '@/lib/media-bucket'
 import { nanoid } from 'nanoid'
 import type { Json } from '@/types'
+
+// MCP는 텍스트(JSON) 인자라 PDF를 base64로 받는다. Vercel 요청 바디 한도(~4.5MB) 안에서
+// 안전하게 처리하려면 디코딩 후 ~3MB로 제한(더 큰 PDF는 웹 드래그드롭 안내).
+const MCP_PDF_MAX = 3 * 1024 * 1024
 
 export const runtime = 'nodejs'
 
@@ -122,12 +127,14 @@ and can be edited/managed from /my-pages. No PIN is involved — never ask for o
 ## Page building guide
 - Block-based pages: use create_page with h1/h2/text/image/button/youtube/link/divider blocks.
 - Raw HTML pages: use create_html_page when the user provides complete HTML. Renders fullscreen exactly as-is.
+- PDF pages: use create_pdf_page (pdf_base64) when the user made or has a PDF to share. Up to ~3MB — larger PDFs go via drag-and-drop at popup2026.com.
 
 ## Examples
 - "카페 소개 페이지" → create_page: h1 + text + image + button
 - "행사 초대장" → create_page: h1 + text + button(RSVP)
 - "링크 모음" → create_page: h1 + multiple link blocks
 - "이 HTML 파일 공유해줘" → create_html_page with the HTML content
+- "방금 만든 PDF/리포트 공유 링크로 만들어줘" → create_pdf_page with the base64 PDF
       `.trim(),
     },
   )
@@ -227,6 +234,87 @@ and can be edited/managed from /my-pages. No PIN is involved — never ask for o
             `📅 유효기간: ${DEFAULT_DAYS}일`,
             ``,
             `페이지를 열면 HTML이 풀스크린으로 표시됩니다.`,
+          ].join('\n'),
+        }],
+      }
+    },
+  )
+
+  // ── Tool: create_pdf_page ────────────────────────────────────
+  server.tool(
+    'create_pdf_page',
+    'Publishes a PDF as a shareable Popup page (fullscreen PDF viewer). Pass the PDF file content as base64 in pdf_base64. Saved to the connected account, editable from /my-pages, no PIN. Use when the user made or has a PDF to share. NOTE: only up to ~3MB — for larger PDFs, tell the user to drag-and-drop the file at popup2026.com instead.',
+    {
+      pdf_base64: z.string().min(1).describe('The PDF file bytes, base64-encoded. Max ~3MB decoded.'),
+      filename: z.string().optional().describe('Optional file name, used as the page title (e.g. "리포트.pdf").'),
+    },
+    { readOnlyHint: false, destructiveHint: false },
+    async ({ pdf_base64, filename }) => {
+      let buffer: Buffer
+      try {
+        buffer = Buffer.from(pdf_base64.replace(/^data:.*;base64,/, ''), 'base64')
+      } catch {
+        return { content: [{ type: 'text' as const, text: 'base64 디코딩에 실패했습니다.' }], isError: true }
+      }
+      if (buffer.length === 0) {
+        return { content: [{ type: 'text' as const, text: '빈 PDF입니다.' }], isError: true }
+      }
+      if (buffer.length > MCP_PDF_MAX) {
+        return { content: [{ type: 'text' as const, text: 'PDF가 ~3MB를 초과합니다. 더 큰 파일은 popup2026.com에서 끌어다 놓아 올려주세요(최대 50MB).' }], isError: true }
+      }
+      if (buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
+        return { content: [{ type: 'text' as const, text: '유효한 PDF 파일이 아닙니다.' }], isError: true }
+      }
+
+      const slug = await generateUniqueSlug()
+      try {
+        await ensureBucket(supabase)
+      } catch (e) {
+        return { content: [{ type: 'text' as const, text: (e as Error).message }], isError: true }
+      }
+      const path = `${slug}/${Date.now()}.pdf`
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, buffer, {
+        contentType: 'application/pdf', upsert: false,
+      })
+      if (upErr) {
+        return { content: [{ type: 'text' as const, text: `업로드 실패: ${upErr.message}` }], isError: true }
+      }
+      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path)
+
+      const { hashPin } = await import('@/lib/pin')
+      const title = (filename ?? '').replace(/\.pdf$/i, '').trim().slice(0, 120) || 'PDF 문서'
+      const expires_at = new Date(Date.now() + DEFAULT_DAYS * 86400000).toISOString()
+      const delete_at = new Date(Date.now() + 365 * 86400000).toISOString()
+
+      const { error } = await supabase.from('pages').insert({
+        slug,
+        blocks: [] as unknown as Json,
+        pdf_url: publicUrl,
+        listing_title: title,
+        pin_hash: await hashPin(randomPin()),
+        expires_at,
+        delete_at,
+        locked: false,
+        user_id: ownerUserId,
+        api_key_id: ownerApiKeyId,
+      })
+      if (error) {
+        // 롤백: 업로드한 파일 정리
+        await supabase.storage.from(BUCKET).remove([path]).catch(() => {})
+        return { content: [{ type: 'text' as const, text: `오류: ${error.message}` }], isError: true }
+      }
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: [
+            `✅ PDF 페이지가 생성됐습니다!`,
+            ``,
+            `🔗 URL: ${BASE}/${slug}`,
+            EDIT_HINT,
+            `📅 유효기간: ${DEFAULT_DAYS}일`,
+            ``,
+            `페이지를 열면 PDF가 풀스크린으로 표시됩니다.`,
           ].join('\n'),
         }],
       }
