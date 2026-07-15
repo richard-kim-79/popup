@@ -72,6 +72,11 @@ export default function McpConnect() {
           <p className="mt-0.5 text-[11px] leading-relaxed text-popup-faint">
             Claude 커넥터에 <code className="rounded bg-popup-surface px-1 text-popup-text">popup2026.com/api/mcp</code> 를 추가하고
             “연결” → 구글 로그인하면 끝이에요. Claude에서 Popup 도구로 만든 페이지가 자동으로 여기에 저장돼요.
+            <br />
+            <span className="text-popup-warn">
+              ⚠️ 예전에 추가한 “popup” 커넥터가 있으면 먼저 삭제하세요. 옛 버전은 PIN을 요구하고
+              HTML 발행이 안 될 수 있어요. 반드시 위 <code className="rounded bg-popup-surface px-1 text-popup-text">popup2026.com/api/mcp</code> 하나만 연결하세요. (PIN 없음)
+            </span>
             <br />아래 개인 키 방식은 Claude Desktop 등 OAuth가 어려운 환경용 대안이에요.
           </p>
         </div>
