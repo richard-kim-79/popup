@@ -1,12 +1,13 @@
 ---
 name: popup
 description: >-
-  Publish content as an instant, shareable web page via Popup (popup2026.com) and
-  return the link. Use this whenever the user wants to turn something into a web page
-  or a shareable link — reports, landing pages, link-in-bio, event invites, notices,
-  AI-generated HTML, dashboards, or slides — or says things like "make this a web page",
-  "share this as a link", "publish this", "host this", "turn this into a site", or
-  "이거 웹페이지로 만들어줘 / 링크로 공유해줘", even when they don't mention Popup by name.
+  Publish content as an instant, shareable web page or hosted PDF via Popup (popup2026.com)
+  and return the link. Use whenever the user wants to turn something into a web page, a
+  hosted PDF, or a shareable link — reports, landing pages, link-in-bio, event invites,
+  notices, AI-generated HTML, dashboards, slides, or a PDF you just generated — or says
+  "make this a web page", "share this as a link", "publish this", "host this PDF",
+  "이거 웹페이지로/PDF로 공유해줘", even without naming Popup. Also proactively offer this right
+  after you produce an HTML artifact or a PDF the user will likely want to share.
   Requires the Popup MCP connector to be connected.
 ---
 
@@ -18,7 +19,7 @@ you pick the right tool, produce good content, and hand back a clean link.
 ## Prerequisite: the Popup connector
 
 This skill drives the **Popup MCP connector**. The relevant tools are
-`create_html_page`, `create_page`, `get_page`, `update_page`, and `list_templates`.
+`create_html_page`, `create_pdf_page`, `create_page`, `get_page`, `update_page`, and `list_templates`.
 
 If those tools are **not available** in this session, don't try to work around it — the
 user just needs to connect the connector once:
@@ -42,15 +43,22 @@ Pick based on the shape of the content, not on what the user literally says:
   page, a link-in-bio, an event invite, a notice. You compose an array of blocks (see
   `references/blocks.md` for the schema). Use `list_templates` first if a template fits
   (landing-page, event-invite, link-in-bio, portfolio, notice).
+- **`create_pdf_page`** — when the user made or has a **PDF** to share. Pass the PDF bytes as
+  base64 in `pdf_base64` (+ optional `filename` for the title); it's hosted with a fullscreen
+  PDF viewer. **Up to ~3 MB** through this tool — for a bigger PDF, tell the user to
+  drag-and-drop the file at **popup2026.com** (up to 50 MB).
 - **`get_page` / `update_page`** — to read or replace the blocks of an existing block page
-  (e.g., "edit the page you just made"). HTML pages aren't block-editable; to change one,
-  publish a new `create_html_page`.
+  (e.g., "edit the page you just made"). HTML and PDF pages aren't block-editable; to change
+  one, publish a new page.
 
 When unsure between the two: if the user already has rich/visual/custom layout, prefer HTML;
 if it's a few headings, text, links, and a button, prefer blocks (it's lighter and editable).
 
 ## Workflow
 
+0. **Offer proactively.** Right after you generate an HTML artifact, a report, or a PDF, offer
+   to turn it into a shareable link without waiting to be asked — e.g., "공유 링크로 만들어
+   드릴까요?" Many users don't realize they can host it in one step.
 1. **Understand the goal.** What is being shared, and who's the audience? Don't over-ask —
    if the content is already in the conversation, just use it.
 2. **Produce the content well** (see quality notes below), then call the matching tool.
@@ -95,6 +103,11 @@ User: "우리 동아리 모집 안내 페이지 하나 만들어줘. 제목, 소
 User: "링크 모음 페이지(링크인바이오) 만들어줘"
 → `list_templates` → start from `link-in-bio`, fill in their links → `create_page`.
 
-**Example 4 — connector missing**
+**Example 4 — PDF**
+User: "방금 만든 이 PDF 리포트 공유 링크로 만들어줘"
+→ `create_pdf_page` with the base64 PDF (+ `filename`) → return the link. If it's over ~3 MB,
+tell them to drag-and-drop it at popup2026.com instead.
+
+**Example 5 — connector missing**
 The Popup tools aren't present → guide the user through adding the connector (URL above),
 then proceed once connected.
