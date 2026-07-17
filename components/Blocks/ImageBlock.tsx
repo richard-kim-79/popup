@@ -17,6 +17,36 @@ interface Props {
 // Supabase 인증 헤더 — XHR 업로드에 필수
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
+// 업로드 재시도/타임아웃 설정
+const MAX_UPLOAD_RETRIES = 2          // 최초 1회 + 재시도 2회 = 최대 3회
+const UPLOAD_TIMEOUT_MS  = 180_000    // 3분 — 느린 모바일에서 50MB 대비
+
+// ── 동시 업로드 제한 (모듈 스코프 — 모든 ImageBlock 인스턴스가 공유) ──
+// 여러 파일을 한꺼번에 드롭해도 동시 PUT을 제한해 모바일 네트워크 실패율을 낮춘다.
+const MAX_CONCURRENT_UPLOADS = 3
+let activeUploads = 0
+const uploadWaitQueue: Array<() => void> = []
+
+function acquireUploadSlot(): Promise<void> {
+  if (activeUploads < MAX_CONCURRENT_UPLOADS) {
+    activeUploads++
+    return Promise.resolve()
+  }
+  return new Promise<void>((resolve) => uploadWaitQueue.push(resolve))
+}
+
+function releaseUploadSlot(): void {
+  const next = uploadWaitQueue.shift()
+  if (next) {
+    next()            // 슬롯을 그대로 다음 대기자에게 인계 (카운트 유지)
+  } else {
+    activeUploads = Math.max(0, activeUploads - 1)
+  }
+}
+
+/** 서버가 명시적으로 거부한(형식·용량·권한) 재시도 불필요 오류 */
+class UploadFatalError extends Error {}
+
 /** URL에서 파일명 추출 */
 function getFilename(url: string, fallback?: string): string {
   if (fallback) return fallback
@@ -59,6 +89,7 @@ function uploadViaXhr(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', signedUrl)
+    xhr.timeout = UPLOAD_TIMEOUT_MS
 
     // Content-Type — 비어있으면 octet-stream으로 fallback (일부 Android)
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
@@ -90,6 +121,7 @@ function uploadViaXhr(
     }
     xhr.onerror = () => reject(new Error('네트워크 오류. 연결 상태를 확인하세요.'))
     xhr.onabort = () => reject(new Error('업로드가 취소됐습니다.'))
+    xhr.ontimeout = () => reject(new Error('업로드 시간이 초과됐습니다. 네트워크를 확인하세요.'))
     xhr.send(file)
   })
 }
@@ -117,41 +149,67 @@ export default function ImageBlock({
     setUploading(true)
     setProgress(0)
 
+    const mime = file.type || guessMime(file.name)
+
+    // 동시 업로드 슬롯 확보 (초과 시 대기)
+    await acquireUploadSlot()
+
     try {
-      // ① Signed URL 발급 (Vercel 경유 — 파일 본문은 여기로 안 보냄)
-      const tokenRes = await fetch(`/api/pages/${slug}/upload`, {
-        method: 'POST',
-        headers: { 'x-edit-token': editToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: file.name,
-          // 일부 기기에서 file.type이 빈 문자열일 수 있으므로 확장자로 보완
-          mimeType: file.type || guessMime(file.name),
-          size: file.size,
-        }),
-      })
-      const tokenData = await tokenRes.json() as {
-        signedUrl?: string; token?: string; path?: string
-        publicUrl?: string; filename?: string; isVideo?: boolean; error?: string
+      let lastErr: Error | null = null
+
+      for (let attempt = 0; attempt <= MAX_UPLOAD_RETRIES; attempt++) {
+        try {
+          // ① 매 시도마다 새 Signed URL 발급 — 새 경로 + 새 토큰이라
+          //    이전 시도의 부분 업로드/만료 토큰과 충돌하지 않는다.
+          const tokenRes = await fetch(`/api/pages/${slug}/upload`, {
+            method: 'POST',
+            headers: { 'x-edit-token': editToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: file.name,
+              // 일부 기기에서 file.type이 빈 문자열일 수 있으므로 확장자로 보완
+              mimeType: mime,
+              size: file.size,
+            }),
+          })
+          const tokenData = await tokenRes.json() as {
+            signedUrl?: string; token?: string; path?: string
+            publicUrl?: string; filename?: string; isVideo?: boolean; error?: string
+          }
+
+          // 서버가 형식·용량·권한으로 거부 → 재시도해도 소용없음
+          if (tokenRes.status === 400 || tokenRes.status === 403 || tokenRes.status === 413) {
+            throw new UploadFatalError(tokenData.error ?? '업로드가 거부됐습니다.')
+          }
+          if (!tokenRes.ok || !tokenData.signedUrl || !tokenData.publicUrl) {
+            throw new Error(tokenData.error ?? '업로드 준비에 실패했습니다.')
+          }
+
+          // ② 파일을 브라우저에서 Supabase로 직접 PUT (Vercel 미경유)
+          await uploadViaXhr(tokenData.signedUrl, file, setProgress)
+
+          // ③ 성공 → 블록 업데이트 후 종료
+          onUpdate(block.id, {
+            url: tokenData.publicUrl,
+            filename: tokenData.filename ?? file.name,
+            width: 'full',
+            mediaType: mimeToMediaType(mime),
+          })
+          return
+        } catch (err) {
+          lastErr = err instanceof Error ? err : new Error('업로드에 실패했습니다.')
+          // 치명적 오류·사용자 취소는 재시도하지 않음
+          if (err instanceof UploadFatalError || lastErr.message.includes('취소')) break
+          // 마지막 시도가 아니면 지수 백오프 후 재시도
+          if (attempt < MAX_UPLOAD_RETRIES) {
+            await new Promise((r) => setTimeout(r, 600 * 2 ** attempt))
+            setProgress(0)
+          }
+        }
       }
 
-      if (!tokenRes.ok || !tokenData.signedUrl || !tokenData.publicUrl) {
-        alert(tokenData.error ?? '업로드 준비에 실패했습니다.')
-        return
-      }
-
-      // ② 파일을 브라우저에서 Supabase로 직접 PUT (Vercel 미경유)
-      await uploadViaXhr(tokenData.signedUrl, file, setProgress)
-
-      // ③ 블록 업데이트
-      onUpdate(block.id, {
-        url: tokenData.publicUrl,
-        filename: tokenData.filename ?? file.name,
-        width: 'full',
-        mediaType: mimeToMediaType(file.type || guessMime(file.name)),
-      })
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '업로드에 실패했습니다.')
+      if (lastErr) alert(lastErr.message)
     } finally {
+      releaseUploadSlot()
       setUploading(false)
       setPendingName('')
       setProgress(0)

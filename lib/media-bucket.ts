@@ -3,6 +3,7 @@
 // upload 라우트와 pdf 생성 라우트가 공유
 // ============================================================
 
+import { randomUUID } from 'node:crypto'
 import type { getSupabaseAdmin } from '@/lib/supabase-server'
 
 /** 허용 MIME — 이미지 / PDF / 영상 */
@@ -62,7 +63,9 @@ export async function createMediaUpload(
 ): Promise<SignedUpload> {
   await ensureBucket(supabase)
   const ext = filename.split('.').pop()?.toLowerCase() ?? 'bin'
-  const path = `${slug}/${Date.now()}.${ext}`
+  // {timestamp}-{random} — 같은 밀리초에 여러 파일이 올라와도 경로가 절대 겹치지 않음
+  // (Date.now() 단독 사용 시 다중 드래그 업로드에서 충돌 → 덮어쓰기/실패 발생)
+  const path = `${slug}/${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`
 
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path)
   if (error || !data) {

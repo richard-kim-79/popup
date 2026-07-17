@@ -44,6 +44,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const pendingFilesRef    = useRef<Map<string, File>>(new Map())
   const savingRef          = useRef(false)
   const pendingBlocksRef   = useRef<Block[] | null>(null)
+  const dirtyRef           = useRef(false)   // 서버에 미반영된 변경 존재 여부
   const [isDragOver, setIsDragOver] = useState(false)
 
   // ── 히스토리 (undo/redo) ─────────────────────────────────────────────
@@ -80,6 +81,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
     // 이미 저장 중이면 pending에 최신 상태 기록 후 리턴
     if (savingRef.current) {
       pendingBlocksRef.current = newBlocks
+      dirtyRef.current = true
       return
     }
 
@@ -98,7 +100,12 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
         window.location.reload()
         return
       }
-      setSaveStatus(res.ok ? 'saved' : 'error')
+      if (res.ok) {
+        dirtyRef.current = false   // 이 스냅샷은 서버 반영 완료
+        setSaveStatus('saved')
+      } else {
+        setSaveStatus('error')
+      }
     } catch {
       // 네트워크 오류
       setSaveStatus('error')
@@ -115,6 +122,7 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
 
   // ── debounce 헬퍼 ───────────────────────────────────────────────────
   const scheduleSave = useCallback((newBlocks: Block[]) => {
+    dirtyRef.current = true
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null
@@ -127,13 +135,16 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
       debounceRef.current = null
-      fetch(`/api/pages/${slug}/blocks`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ editToken, blocks: blocksRef.current }),
-        keepalive: true,
-      }).catch(() => {})
     }
+    // 미반영 변경이 있으면(디바운스 대기 중이든, 저장 진행 중이든) 최신 상태를 즉시 전송.
+    // 저장 진행 중에 탭이 닫혀 마지막 변경분이 유실되던 문제를 방지.
+    if (!dirtyRef.current) return
+    fetch(`/api/pages/${slug}/blocks`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ editToken, blocks: blocksRef.current }),
+      keepalive: true,
+    }).catch(() => {})
   }, [slug, editToken])
 
   // ── 탭 숨김·닫기 이벤트 ─────────────────────────────────────────────
@@ -159,40 +170,44 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   }, [save])
 
   // ── 블록 CRUD ────────────────────────────────────────────────────────
+  // 부수효과(scheduleSave·pushHistory)는 setState updater 밖에서 실행한다.
+  // updater는 순수해야 하며, React StrictMode/동시성 모드에서 두 번 실행되면
+  // 저장·히스토리가 중복 발동하기 때문. blocksRef가 최신 상태의 단일 소스.
   const handleUpdate = useCallback((id: string, patch: Partial<Block>) => {
-    setBlocks((prev) => {
-      const next = prev.map((b) => b.id === id ? { ...b, ...patch } : b) as Block[]
-      blocksRef.current = next
-      scheduleSave(next)
-      pushHistoryDebounced(next)   // 텍스트 입력은 300ms 디바운스 후 스냅샷
-      return next
-    })
+    // 이미지 URL이 채워지면(업로드 완료) 대기 파일 참조 제거 → 메모리·재업로드 방지
+    if ('url' in patch && (patch as { url?: string }).url) {
+      pendingFilesRef.current.delete(id)
+    }
+    const next = blocksRef.current.map((b) => b.id === id ? { ...b, ...patch } : b) as Block[]
+    blocksRef.current = next
+    setBlocks(next)
+    scheduleSave(next)
+    pushHistoryDebounced(next)   // 텍스트 입력은 300ms 디바운스 후 스냅샷
   }, [scheduleSave, pushHistoryDebounced])
 
   const handleDelete = useCallback((id: string) => {
-    setBlocks((prev) => {
-      if (prev.length <= 1) return prev
-      const idx = prev.findIndex((b) => b.id === id)
-      const next = prev.filter((b) => b.id !== id)
-      blocksRef.current = next
-      setSelectedId(next[Math.max(0, idx - 1)]?.id ?? null)
-      scheduleSave(next)
-      pushHistory(next)            // 삭제는 즉시 스냅샷
-      return next
-    })
+    const prev = blocksRef.current
+    if (prev.length <= 1) return
+    const idx = prev.findIndex((b) => b.id === id)
+    const next = prev.filter((b) => b.id !== id)
+    pendingFilesRef.current.delete(id)
+    blocksRef.current = next
+    setBlocks(next)
+    setSelectedId(next[Math.max(0, idx - 1)]?.id ?? null)
+    scheduleSave(next)
+    pushHistory(next)            // 삭제는 즉시 스냅샷
   }, [scheduleSave, pushHistory])
 
   const handleAddBelow = useCallback((id: string) => {
     const nb: Block = { id: nanoid(6), type: 'text', content: '' }
-    setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === id)
-      const next = [...prev]
-      next.splice(idx + 1, 0, nb)
-      blocksRef.current = next
-      scheduleSave(next)
-      pushHistory(next)            // 추가는 즉시 스냅샷
-      return next
-    })
+    const prev = blocksRef.current
+    const idx = prev.findIndex((b) => b.id === id)
+    const next = [...prev]
+    next.splice(idx + 1, 0, nb)
+    blocksRef.current = next
+    setBlocks(next)
+    scheduleSave(next)
+    pushHistory(next)            // 추가는 즉시 스냅샷
     setTimeout(() => setSelectedId(nb.id), 0)
   }, [scheduleSave, pushHistory])
 
@@ -206,15 +221,14 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
   const handleAddImages = useCallback((afterId: string, files: File[]) => {
     const newBlocks: Block[] = files.map(() => ({ id: nanoid(6), type: 'image' } as ImageBlockType))
     files.forEach((file, i) => pendingFilesRef.current.set(newBlocks[i].id, file))
-    setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === afterId)
-      const next = [...prev]
-      next.splice(idx + 1, 0, ...newBlocks)
-      blocksRef.current = next
-      scheduleSave(next)
-      pushHistory(next)            // 이미지 추가는 즉시 스냅샷
-      return next
-    })
+    const prev = blocksRef.current
+    const idx = prev.findIndex((b) => b.id === afterId)
+    const next = [...prev]
+    next.splice(idx + 1, 0, ...newBlocks)
+    blocksRef.current = next
+    setBlocks(next)
+    scheduleSave(next)
+    pushHistory(next)            // 이미지 추가는 즉시 스냅샷
   }, [scheduleSave, pushHistory])
 
   const handleAdd = useCallback((type: BlockType) => {
@@ -224,13 +238,11 @@ export default function Editor({ slug, editToken, initialBlocks, daysLeft, locke
       youtube: {}, link: {},
     }
     const nb = { id: nanoid(6), type, ...defaults[type] } as Block
-    setBlocks((prev) => {
-      const next = [...prev, nb]
-      blocksRef.current = next
-      scheduleSave(next)
-      pushHistory(next)            // 블록 추가는 즉시 스냅샷
-      return next
-    })
+    const next = [...blocksRef.current, nb]
+    blocksRef.current = next
+    setBlocks(next)
+    scheduleSave(next)
+    pushHistory(next)            // 블록 추가는 즉시 스냅샷
     setTimeout(() => setSelectedId(nb.id), 0)
   }, [scheduleSave, pushHistory])
 

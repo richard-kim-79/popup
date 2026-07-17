@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
-import { removePageStorage } from '@/lib/storage-cleanup'
+import { removePageStorage, sweepOrphans } from '@/lib/storage-cleanup'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -56,12 +56,18 @@ async function run(): Promise<NextResponse> {
     await admin.from('pages').update({ storage_purged_at: nowIso }).in('id', purgedIds)
   }
 
+  // 4) 살아있는 페이지의 미참조 media 파일(orphan) 회수.
+  //    (과거엔 blocks 저장마다 인라인 실행 → 방금 올라온 파일 오삭제 레이스가 있어 크론으로 이전)
+  const sweep = await sweepOrphans(admin).catch(() => ({ scannedPages: 0, removedObjects: 0 }))
+
   return NextResponse.json({
     ok: true,
     locked: lockedRows?.length ?? 0,
     soft_deleted: softRows?.length ?? 0,
     storage_purged_pages: purgedIds.length,
     storage_objects_removed: storageRemoved,
+    orphan_scanned_pages: sweep.scannedPages,
+    orphan_objects_removed: sweep.removedObjects,
   })
 }
 
